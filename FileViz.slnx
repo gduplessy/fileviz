@@ -5,4 +5,5 @@
   <Project Path="src/FileViz.Worker/FileViz.Worker.csproj" />
   <Project Path="src/FileViz.App/FileViz.App.csproj" />
   <Project Path="tests/FileViz.Tests/FileViz.Tests.csproj" />
+  <Project Path="tools/FileViz.Benchmarks/FileViz.Benchmarks.csproj" />
 </Solution>
