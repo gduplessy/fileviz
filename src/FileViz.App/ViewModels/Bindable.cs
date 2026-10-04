@@ -2,24 +2,35 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 namespace FileViz.App.ViewModels;
+
 public abstract class Bindable : INotifyPropertyChanged
 {
     public event PropertyChangedEventHandler? PropertyChanged;
-    protected bool Set<T>(ref T field,T value,[CallerMemberName]string? name=null){if(EqualityComparer<T>.Default.Equals(field,value))return false;field=value;Changed(name);return true;}
-    protected void Changed([CallerMemberName]string? name=null)=>PropertyChanged?.Invoke(this,new(name));
+    protected bool Set<T>(ref T field, T value, [CallerMemberName] string? name = null)
+    {
+        if (EqualityComparer<T>.Default.Equals(field, value))
+            return false;
+        field = value;
+        Changed(name);
+        return true;
+    }
+    protected void Changed([CallerMemberName] string? name = null) => PropertyChanged?.Invoke(this, new(name));
 }
-public sealed class ActionCommand(Action action,Func<bool>? canExecute=null) : ICommand
+public sealed class ActionCommand(Action action, Func<bool>? canExecute = null) : ICommand
 {
-    public bool CanExecute(object? parameter)=>canExecute?.Invoke()??true;
-    public void Execute(object? parameter)=>action();
-    public event EventHandler? CanExecuteChanged { add=>CommandManager.RequerySuggested+=value;remove=>CommandManager.RequerySuggested-=value; }
+    public bool CanExecute(object? parameter) => canExecute?.Invoke() ?? true;
+    public void Execute(object? parameter) => action();
+    public event EventHandler? CanExecuteChanged { add => CommandManager.RequerySuggested += value; remove => CommandManager.RequerySuggested -= value; }
 }
-public sealed class DriveRow(string path,string label,string detail,bool selected=false) : Bindable
+public sealed class DriveRow(string path, string label, string detail, bool selected = false) : Bindable
 {
-    public string Path { get; }=path;public string Label { get; }=label;public string Detail { get; }=detail;
-    private bool chosen=selected;public bool Selected{get=>chosen;set=>Set(ref chosen,value);}
+    public string Path { get; } = path; public string Label { get; } = label; public string Detail { get; } = detail;
+    private bool chosen = selected; public bool Selected
+    {
+        get => chosen; set => Set(ref chosen, value);
+    }
 }
 public sealed record SnapshotRow(FileViz.Core.Snapshot Value)
 {
-    public string Label=>$"#{Value.Id} · {Value.State} · {DateTime.Parse(Value.Started).ToLocalTime():g} · {Value.Files:N0} files";
+    public string Label => $"#{Value.Id} · {Value.State} · {DateTime.Parse(Value.Started).ToLocalTime():g} · {Value.Files:N0} files";
 }

@@ -8,7 +8,9 @@ public static class Hashing
 {
     public static HashAlgorithmName Algorithm(string name) => name.Replace("-", "").ToUpperInvariant() switch
     {
-        "SHA256" => HashAlgorithmName.SHA256, "SHA1" => HashAlgorithmName.SHA1, "MD5" => HashAlgorithmName.MD5,
+        "SHA256" => HashAlgorithmName.SHA256,
+        "SHA1" => HashAlgorithmName.SHA1,
+        "MD5" => HashAlgorithmName.MD5,
         _ => throw new ArgumentException("Supported algorithms: SHA-256, SHA-1, MD5.", nameof(name))
     };
     public static async Task<HashResult> HashAsync(HashRequest request, CancellationToken token = default)
@@ -16,12 +18,16 @@ public static class Hashing
         try
         {
             var entry = Native.ReadEntry(request.Entry.Path);
-            if (entry.IsDirectory || entry.IsPlaceholder || entry.IsReparse) throw new IOException("Directories, reparse points and offline placeholders are not hashed.");
-            if ((request.Entry.Identity != null && entry.Identity != request.Entry.Identity) || entry.Length != request.Entry.Length || entry.ModifiedTicks != request.Entry.ModifiedTicks || (request.Entry.ChangeTicks != 0 && entry.ChangeTicks != request.Entry.ChangeTicks)) throw new IOException("File changed since the scan; rescan first.");
+            if (entry.IsDirectory || entry.IsPlaceholder || entry.IsReparse)
+                throw new IOException("Directories, reparse points and offline placeholders are not hashed.");
+            if ((request.Entry.Identity != null && entry.Identity != request.Entry.Identity) || entry.Length != request.Entry.Length || entry.ModifiedTicks != request.Entry.ModifiedTicks || (request.Entry.ChangeTicks != 0 && entry.ChangeTicks != request.Entry.ChangeTicks))
+                throw new IOException("File changed since the scan; rescan first.");
             using var handle = Native.CreateFileW(Native.LongPath(entry.Path), 0x80000000, 1, IntPtr.Zero, 3, Native.BackupSemantics | Native.OpenReparsePoint, IntPtr.Zero);
-            if (handle.IsInvalid) throw new Win32Exception(System.Runtime.InteropServices.Marshal.GetLastWin32Error());
+            if (handle.IsInvalid)
+                throw new Win32Exception(System.Runtime.InteropServices.Marshal.GetLastWin32Error());
             var opened = Native.ReadEntry(handle, entry.Path);
-            if (opened.Identity != entry.Identity || opened.Length != entry.Length || opened.ChangeTicks != entry.ChangeTicks) throw new IOException("File changed while opening.");
+            if (opened.Identity != entry.Identity || opened.Length != entry.Length || opened.ChangeTicks != entry.ChangeTicks)
+                throw new IOException("File changed while opening.");
             using var stream = new FileStream(handle, FileAccess.Read, 1024 * 1024, false);
             using var hash = IncrementalHash.CreateHash(Algorithm(request.Algorithm));
             var buffer = ArrayPool<byte>.Shared.Rent(1024 * 1024);
@@ -32,22 +38,28 @@ public static class Hashing
                     hash.AppendData(BitConverter.GetBytes(opened.Length));
                     foreach (var offset in new[] { 0L, opened.Length / 2 - 32768, opened.Length - 65536 })
                     {
-                        token.ThrowIfCancellationRequested(); stream.Position = offset;
-                        await stream.ReadExactlyAsync(buffer.AsMemory(0, 65536), token); hash.AppendData(buffer, 0, 65536);
+                        token.ThrowIfCancellationRequested();
+                        stream.Position = offset;
+                        await stream.ReadExactlyAsync(buffer.AsMemory(0, 65536), token);
+                        hash.AppendData(buffer, 0, 65536);
                     }
                 }
                 else
                 {
                     int count;
-                    while ((count = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), token)) > 0) hash.AppendData(buffer, 0, count);
+                    while ((count = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), token)) > 0)
+                        hash.AppendData(buffer, 0, count);
                 }
                 var after = Native.ReadEntry(handle, entry.Path);
-                if (after.Identity != opened.Identity || after.Length != opened.Length || after.ModifiedTicks != opened.ModifiedTicks || after.ChangeTicks != opened.ChangeTicks) throw new IOException("File changed while hashing.");
+                if (after.Identity != opened.Identity || after.Length != opened.Length || after.ModifiedTicks != opened.ModifiedTicks || after.ChangeTicks != opened.ChangeTicks)
+                    throw new IOException("File changed while hashing.");
                 return new(entry.Path, Convert.ToHexString(hash.GetHashAndReset()), opened.Identity, opened.Length, opened.ModifiedTicks, opened.ChangeTicks, null);
             }
             finally { ArrayPool<byte>.Shared.Return(buffer); }
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or Win32Exception or CryptographicException)
-        { return new(request.Entry.Path, null, null, 0, 0, 0, e.Message); }
+        {
+            return new(request.Entry.Path, null, null, 0, 0, 0, e.Message);
+        }
     }
 }
