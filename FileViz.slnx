@@ -1,0 +1,8 @@
+<Solution>
+  <Project Path="src/FileViz.Core/FileViz.Core.csproj" />
+  <Project Path="src/FileViz.Windows/FileViz.Windows.csproj" />
+  <Project Path="src/FileViz.Data/FileViz.Data.csproj" />
+  <Project Path="src/FileViz.Worker/FileViz.Worker.csproj" />
+  <Project Path="src/FileViz.App/FileViz.App.csproj" />
+  <Project Path="tests/FileViz.Tests/FileViz.Tests.csproj" />
+</Solution>

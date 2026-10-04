@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>WinExe</OutputType><UseWPF>true</UseWPF><AssemblyName>FileViz</AssemblyName><ApplicationManifest>app.manifest</ApplicationManifest></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../FileViz.Data/FileViz.Data.csproj" /><ProjectReference Include="../FileViz.Windows/FileViz.Windows.csproj" /></ItemGroup>
+</Project>

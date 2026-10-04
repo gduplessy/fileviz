@@ -1,0 +1,1 @@
+Console.Error.WriteLine("FileViz worker: launch from the desktop app.");
