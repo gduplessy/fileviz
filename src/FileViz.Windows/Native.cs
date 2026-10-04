@@ -94,7 +94,7 @@ public static class Native
         {
             string? identity = null; long? allocated = null; long changed = 0;
             if (GetFileInformationByHandleEx(handle, 18, buffer, 24))
-                identity = Marshal.ReadInt64(buffer).ToString("x16") + ":" + Convert.ToHexString(ReadBuffer(buffer + 8, 16));
+                identity = VolumeName(path) + ":" + Convert.ToHexString(ReadBuffer(buffer + 8, 16));
             else if (info.IndexHigh != 0 || info.IndexLow != 0)
                 identity = info.VolumeSerial.ToString("x8") + ":" + (((ulong)info.IndexHigh << 32) | info.IndexLow).ToString("x16");
             if (GetFileInformationByHandleEx(handle, 1, buffer, 24)) allocated = Marshal.ReadInt64(buffer);

@@ -25,7 +25,7 @@ public sealed class MftScanEngine : IScanEngine
             }
             if(++counter%16384==0)yield return new(scope.Root,$"MFT: indexing ancestry ({counter:N0} records)",[],[]);
         }
-        var volumeName=Native.VolumeName(root); var pathCache=new Dictionary<ulong,string>(); var entries=new List<FileEntry>(256); var errors=new List<ScanError>();
+        var budget=0;var excludedParents=new Dictionary<ulong,bool>();var volumeName=Native.VolumeName(root); var pathCache=new Dictionary<ulong,string>(); var entries=new List<FileEntry>(256); var errors=new List<ScanError>();
         foreach(var record in reader.Records(cancellationToken))
         {
             if(!record.InUse || record.BaseReference!=0 || (record.Reference&NtfsParser.ReferenceMask)==5)continue;
@@ -33,13 +33,21 @@ public sealed class MftScanEngine : IScanEngine
             foreach(var name in full.Names)
             {
                 var parent=Resolve(name.Parent,root,directories,pathCache); var path=System.IO.Path.Combine(parent,name.Name);
-                if(Paths.Excluded(path,scope.Exclusions))continue;
+                if(!excludedParents.TryGetValue(name.Parent,out var excluded))
+                {
+                    var ancestor=parent;excluded=false;
+                    while(Paths.Within(ancestor,scope.Root)){if(Paths.Excluded(ancestor,scope.Exclusions)){excluded=true;break;}var nextParent=System.IO.Path.GetDirectoryName(ancestor);if(nextParent==null || nextParent==ancestor)break;ancestor=nextParent;}
+                    if(excludedParents.Count>=10000)excludedParents.Clear();excludedParents[name.Parent]=excluded;
+                }
+                if(excluded || Paths.Excluded(path,scope.Exclusions))continue;
+                if(path.Length>32760)throw new NotSupportedException("NTFS path exceeds the supported Win32 path length.");
                 var data=full.Data.FirstOrDefault(x=>x.Type==0x80 && x.Name.Length==0 && x.LowestVcn==0);
                 var attributes=full.Attributes | (full.IsDirectory?16u:0u);
                 var idBytes=new byte[16]; BinaryPrimitives.WriteUInt64LittleEndian(idBytes,full.Reference);
                 entries.Add(new(path,parent,name.Name,volumeName+":"+Convert.ToHexString(idBytes),full.IsDirectory,
                     full.IsDirectory?0:data?.Length??0,full.IsDirectory?0:data?.Allocated??0,full.ModifiedTicks,full.ChangeTicks,attributes));
-                if(entries.Count==256){yield return new(scope.Root,"Raw MFT",entries.ToArray(),errors.ToArray());entries.Clear();errors.Clear();}
+                budget+=6*(path.Length+parent.Length+name.Name.Length)+1024;
+                if(entries.Count==256 || budget>=1024*1024){yield return new(scope.Root,"Raw MFT",entries.ToArray(),errors.ToArray());entries.Clear();budget=0;errors.Clear();}
             }
         }
         reader.ValidateStableMft();
@@ -123,6 +131,9 @@ internal sealed class MftReader : IDisposable
     private byte[] ReadAttribute(NtfsAttribute attribute)
     {
         if(attribute.Length<0 || attribute.Length>64*1024*1024)throw new NotSupportedException("Attribute list exceeds parser memory budget.");
+        var savedPosition=stream.Position;
+        try
+        {
         var value=new byte[(int)attribute.Length];var written=0;
         foreach(var run in attribute.Runs)
         {
@@ -131,6 +142,8 @@ internal sealed class MftReader : IDisposable
             var aligned=checked((count+sectorSize-1)/sectorSize*sectorSize);var buffer=new byte[aligned];stream.Position=checked(run.Lcn.Value*clusterSize);stream.ReadExactly(buffer);buffer.AsSpan(0,count).CopyTo(value.AsSpan(written));written+=count;
         }
         if(written!=value.Length)throw new InvalidDataException("Incomplete attribute list.");return value;
+        }
+        finally{stream.Position=savedPosition;}
     }
     public IEnumerable<NtfsRecord> Records(CancellationToken token)
     {

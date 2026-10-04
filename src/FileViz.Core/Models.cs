@@ -24,7 +24,7 @@ public record HashRequest(FileEntry Entry, string Algorithm, bool Sample = false
 public record HashResult(string Path, string? Hash, string? Identity, long Length, long ModifiedTicks, long ChangeTicks, string? Error);
 public record WorkerRequest(string Operation, ScanScope[]? Scopes = null, HashRequest[]? Hashes = null);
 public record WorkerMessage(string Kind, ScanBatch? Batch = null, HashResult? Hash = null, string? Text = null);
-public record QueryFilter(string Search = "", string Extension = "", long MinimumSize = 0, long? ModifiedAfter = null, uint RequiredAttributes = 0, string? Parent = null, bool Allocated = false);
+public record QueryFilter(string Search = "", string Extension = "", long MinimumSize = 0, long? ModifiedAfter = null, uint RequiredAttributes = 0, string? Parent = null, bool Allocated = false, string? Root = null);
 public record Difference(string Path, string Change, long Before, long After) { public long Delta => After - Before; }
 public record CleanupRecord(string Id, string Original, string Destination, string Identity, string State, string Time, string? Error = null);
 

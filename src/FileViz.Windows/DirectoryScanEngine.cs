@@ -10,7 +10,7 @@ public sealed class DirectoryScanEngine : IScanEngine
     public async IAsyncEnumerable<ScanBatch> ScanAsync(ScanScope scope, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         await Task.Yield();
-        var entries = new List<FileEntry>(256); var errors = new List<ScanError>();
+        var entries = new List<FileEntry>(256); var budget=0; var errors = new List<ScanError>();
         var volume = Native.VolumeName(scope.Root);
         var stack = new Stack<(string Directory, IEnumerator<FileEntry> Iterator)>();
         var root = Paths.Normalize(scope.Root);
@@ -26,15 +26,15 @@ public sealed class DirectoryScanEngine : IScanEngine
                 if (ended) { stack.Pop().Iterator.Dispose(); }
                 else if (entry != null && !Paths.Excluded(entry.Path, scope.Exclusions))
                 {
-                    entries.Add(entry);
+                    entries.Add(entry);budget+=6*(entry.Path.Length+entry.Parent.Length+entry.Name.Length)+1024;
                     if (entry.IsDirectory && !entry.IsReparse && !entry.IsPlaceholder)
                     {
                         if (stack.Count >= 512) errors.Add(new(entry.Path,"Directory depth exceeds the handle budget."));
                         else stack.Push((entry.Path,Enumerate(entry.Path,volume).GetEnumerator()));
                     }
                 }
-                if(entries.Count >= 256 || errors.Count >= 64)
-                { yield return new(scope.Root,"Directory",entries.ToArray(),errors.ToArray()); entries.Clear(); errors.Clear(); }
+                if(entries.Count >= 256 || budget>=1024*1024 || errors.Count >= 64)
+                { yield return new(scope.Root,"Directory",entries.ToArray(),errors.ToArray()); entries.Clear();budget=0; errors.Clear(); }
             }
         }
         finally { while(stack.Count > 0)stack.Pop().Iterator.Dispose(); }

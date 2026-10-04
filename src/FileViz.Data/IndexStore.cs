@@ -3,7 +3,7 @@ using FileViz.Core;
 using Microsoft.Data.Sqlite;
 namespace FileViz.Data;
 
-public sealed class IndexStore : IDisposable
+public sealed partial class IndexStore : IDisposable
 {
     private readonly SqliteConnection connection;
     public string DatabasePath { get; }
@@ -23,10 +23,15 @@ public sealed class IndexStore : IDisposable
         CREATE INDEX IF NOT EXISTS entries_identity ON entries(snapshot,identity);
         CREATE INDEX IF NOT EXISTS entries_extension ON entries(snapshot,extension,length DESC);
         CREATE TABLE IF NOT EXISTS errors(snapshot INTEGER NOT NULL REFERENCES snapshots(id) ON DELETE CASCADE,path TEXT NOT NULL,message TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS folders(snapshot INTEGER NOT NULL REFERENCES snapshots(id) ON DELETE CASCADE,path TEXT NOT NULL,parent TEXT NOT NULL,depth INTEGER NOT NULL,logical INTEGER NOT NULL DEFAULT 0,allocated INTEGER NOT NULL DEFAULT 0,files INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(snapshot,path));
+        CREATE TABLE IF NOT EXISTS folders(snapshot INTEGER NOT NULL REFERENCES snapshots(id) ON DELETE CASCADE,path TEXT NOT NULL,parent TEXT NOT NULL,depth INTEGER NOT NULL,root TEXT NOT NULL,logical INTEGER NOT NULL DEFAULT 0,allocated INTEGER NOT NULL DEFAULT 0,files INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(snapshot,path));
+        CREATE TABLE IF NOT EXISTS root_totals(snapshot INTEGER NOT NULL REFERENCES snapshots(id) ON DELETE CASCADE,root TEXT NOT NULL,files INTEGER NOT NULL,folders INTEGER NOT NULL,logical INTEGER NOT NULL,allocated INTEGER NOT NULL,unknown INTEGER NOT NULL,PRIMARY KEY(snapshot,root));
+        CREATE INDEX IF NOT EXISTS entries_root_size ON entries(snapshot,root,isdir,length DESC,path);
+        CREATE INDEX IF NOT EXISTS entries_root_allocated ON entries(snapshot,root,isdir,allocated DESC,path);
+        CREATE INDEX IF NOT EXISTS errors_snapshot ON errors(snapshot);
+        CREATE INDEX IF NOT EXISTS folders_rank ON folders(snapshot,root,logical DESC);
         CREATE INDEX IF NOT EXISTS folders_depth ON folders(snapshot,depth,parent);
         CREATE TABLE IF NOT EXISTS hashes(path TEXT NOT NULL,algorithm TEXT NOT NULL,sample INTEGER NOT NULL,identity TEXT NOT NULL,length INTEGER NOT NULL,modified INTEGER NOT NULL,changed INTEGER NOT NULL,hash TEXT NOT NULL,PRIMARY KEY(path,algorithm,sample));
-        CREATE TABLE IF NOT EXISTS duplicates(snapshot INTEGER NOT NULL REFERENCES snapshots(id) ON DELETE CASCADE,groupid INTEGER NOT NULL,path TEXT NOT NULL,evidence TEXT NOT NULL,keeper INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(snapshot,path));
+        CREATE TABLE IF NOT EXISTS duplicates(snapshot INTEGER NOT NULL REFERENCES snapshots(id) ON DELETE CASCADE,groupid INTEGER NOT NULL,path TEXT NOT NULL,evidence TEXT NOT NULL,keeper INTEGER NOT NULL DEFAULT 0,source INTEGER NOT NULL,PRIMARY KEY(snapshot,path));
         CREATE TABLE IF NOT EXISTS profiles(name TEXT PRIMARY KEY,json TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS cleanup(id TEXT PRIMARY KEY,original TEXT NOT NULL,destination TEXT NOT NULL,identity TEXT NOT NULL,state TEXT NOT NULL,time TEXT NOT NULL,error TEXT);
 
@@ -61,19 +66,38 @@ public sealed class IndexStore : IDisposable
     public void Finish(long snapshot, string state)
     {
         RebuildFolders(snapshot);
-        var summary = GetSummary(snapshot);
+        var summary = GetSummaryRaw(snapshot);
+        CacheSummaries(snapshot,summary);
         Execute("UPDATE snapshots SET state=$state,files=$files,logical=$logical,allocated=$allocated,errors=$errors WHERE id=$s;",
             ("$state", summary.Errors > 0 && state == "Complete" ? "Partial" : state), ("$files", summary.Files), ("$logical", summary.Logical), ("$allocated", summary.Allocated), ("$errors", summary.Errors), ("$s", snapshot));
     }
     public void SetState(long snapshot, string state) => Execute("UPDATE snapshots SET state=$state WHERE id=$s;", ("$state", state), ("$s", snapshot));
-    public Summary GetSummary(long snapshot)
+    public Summary GetSummary(long snapshot,string? root=null)
+    {
+        using var command=Command("SELECT files,folders,logical,allocated,unknown,(SELECT COUNT(*) FROM errors WHERE snapshot=$s) FROM root_totals WHERE snapshot=$s AND root=$root;",("$s",snapshot),("$root",root??""));
+        using(var reader=command.ExecuteReader()){if(reader.Read())return new(reader.GetInt64(0),reader.GetInt64(1),reader.GetInt64(2),reader.GetInt64(3),reader.GetInt64(4),reader.GetInt64(5));}
+        return GetSummaryRaw(snapshot,root);
+    }
+    private void CacheSummaries(long snapshot,Summary summary)
+    {
+        Execute("DELETE FROM root_totals WHERE snapshot=$s;",("$s",snapshot));
+        Execute("""
+        WITH counts AS(SELECT root,SUM(CASE WHEN isdir=0 THEN 1 ELSE 0 END) f,SUM(isdir) d,SUM(CASE WHEN isdir=0 THEN length ELSE 0 END) l,SUM(CASE WHEN isdir=0 AND allocated IS NULL THEN 1 ELSE 0 END) u FROM entries WHERE snapshot=$s GROUP BY root),
+        allocation AS(SELECT root,SUM(a) a FROM(SELECT root,MAX(allocated) a FROM entries WHERE snapshot=$s AND isdir=0 GROUP BY root,COALESCE(identity,path))GROUP BY root)
+        INSERT INTO root_totals SELECT $s,counts.root,f,d,l,COALESCE(allocation.a,0),u FROM counts LEFT JOIN allocation USING(root);
+        """,("$s",snapshot));
+        Execute("INSERT INTO root_totals VALUES($s,'',$f,$d,$l,$a,$u);",("$s",snapshot),("$f",summary.Files),("$d",summary.Folders),("$l",summary.Logical),("$a",summary.Allocated),("$u",summary.UnknownAllocations));
+    }
+    public void MarkStale(string original)
+    { Execute("UPDATE snapshots SET state=state||' · Stale' WHERE id IN(SELECT snapshot FROM entries WHERE path=$p) AND INSTR(state,'Stale')=0;",("$p",original)); }
+    private Summary GetSummaryRaw(long snapshot, string? root = null)
     {
         using var command = Command("""
         SELECT SUM(CASE WHEN isdir=0 THEN 1 ELSE 0 END),SUM(isdir),SUM(CASE WHEN isdir=0 THEN length ELSE 0 END),
-        (SELECT COALESCE(SUM(a),0) FROM (SELECT MAX(allocated) a FROM entries WHERE snapshot=$s AND isdir=0 GROUP BY COALESCE(identity,path))),
+        (SELECT COALESCE(SUM(a),0) FROM (SELECT MAX(allocated) a FROM entries WHERE snapshot=$s AND ($root IS NULL OR root=$root) AND isdir=0 GROUP BY COALESCE(identity,path))),
         SUM(CASE WHEN isdir=0 AND allocated IS NULL THEN 1 ELSE 0 END),(SELECT COUNT(*) FROM errors WHERE snapshot=$s)
-        FROM entries WHERE snapshot=$s;
-        """, ("$s", snapshot));
+        FROM entries WHERE snapshot=$s AND ($root IS NULL OR root=$root);
+        """, ("$s", snapshot), ("$root", root));
         using var reader = command.ExecuteReader(); reader.Read();
         long Value(int index) => reader.IsDBNull(index) ? 0 : reader.GetInt64(index);
         return new(Value(0), Value(1), Value(2), Value(3), Value(4), Value(5));
@@ -82,10 +106,10 @@ public sealed class IndexStore : IDisposable
     {
         Execute("DELETE FROM folders WHERE snapshot=$s;", ("$s", snapshot));
         Execute("""
-        INSERT OR IGNORE INTO folders(snapshot,path,parent,depth)
-        SELECT snapshot,path,parent,LENGTH(path)-LENGTH(REPLACE(path,'\','')) FROM entries WHERE snapshot=$s AND isdir=1;
-        INSERT OR IGNORE INTO folders(snapshot,path,parent,depth)
-        SELECT snapshot,root,root,LENGTH(root)-LENGTH(REPLACE(root,'\','')) FROM entries WHERE snapshot=$s GROUP BY root;
+        INSERT OR IGNORE INTO folders(snapshot,path,parent,depth,root)
+        SELECT snapshot,path,parent,LENGTH(path)-LENGTH(REPLACE(path,'\','')),root FROM entries WHERE snapshot=$s AND isdir=1;
+        INSERT OR IGNORE INTO folders(snapshot,path,parent,depth,root)
+        SELECT snapshot,root,root,LENGTH(root)-LENGTH(REPLACE(root,'\','')),root FROM entries WHERE snapshot=$s GROUP BY root;
         UPDATE folders SET logical=COALESCE((SELECT SUM(length) FROM entries WHERE snapshot=$s AND isdir=0 AND parent=folders.path),0),
         files=(SELECT COUNT(*) FROM entries WHERE snapshot=$s AND isdir=0 AND parent=folders.path),
         allocated=COALESCE((SELECT SUM(allocated) FROM entries e WHERE snapshot=$s AND isdir=0 AND parent=folders.path AND (identity IS NULL OR path=(SELECT MIN(path) FROM entries a WHERE a.snapshot=$s AND a.identity=e.identity))),0)
@@ -110,6 +134,7 @@ public sealed class IndexStore : IDisposable
     {
         var where = "e.snapshot=$s" + (filesOnly ? " AND e.isdir=0" : "");
         using var command = connection.CreateCommand(); command.Parameters.AddWithValue("$s", snapshot);
+        if (filter.Root != null) { where += " AND e.root=$root"; command.Parameters.AddWithValue("$root", filter.Root); }
         if (filter.Search.Length > 0) { where += " AND e.path LIKE $search ESCAPE '!'"; command.Parameters.AddWithValue("$search", "%" + EscapeLike(filter.Search) + "%"); }
         if (filter.Extension.Length > 0) { where += " AND e.extension=$ext"; command.Parameters.AddWithValue("$ext", filter.Extension.StartsWith('.') ? filter.Extension.ToLowerInvariant() : "." + filter.Extension.ToLowerInvariant()); }
         if (filter.MinimumSize > 0) { where += " AND e.length >= $min"; command.Parameters.AddWithValue("$min", filter.MinimumSize); }
@@ -120,14 +145,14 @@ public sealed class IndexStore : IDisposable
         command.Parameters.AddWithValue("$limit", Math.Clamp(pageSize, 1, 1000)); command.Parameters.AddWithValue("$offset", Math.Max(0, page) * Math.Clamp(pageSize, 1, 1000));
         using var reader = command.ExecuteReader(); var result = new List<FileEntry>(); while (reader.Read()) result.Add(Entry(reader)); return result;
     }
-    public List<Breakdown> LargestFolders(long snapshot, bool allocated = false, string? parent = null)
+    public List<Breakdown> LargestFolders(long snapshot, bool allocated = false, string? parent = null, string? root = null)
     {
-        using var command = Command($"SELECT path,{(allocated ? "allocated" : "logical")},files FROM folders WHERE snapshot=$s {(parent == null ? "" : "AND parent=$parent AND path<>parent")} ORDER BY {(allocated ? "allocated" : "logical")} DESC LIMIT 100;", ("$s", snapshot), ("$parent", parent));
+        using var command = Command($"SELECT path,{(allocated ? "allocated" : "logical")},files FROM folders WHERE snapshot=$s AND ($root IS NULL OR path=$root OR path LIKE $prefix ESCAPE '!') {(parent == null ? "" : "AND parent=$parent AND path<>parent")} ORDER BY {(allocated ? "allocated" : "logical")} DESC LIMIT 100;", ("$s", snapshot), ("$parent", parent), ("$root", root), ("$prefix", root == null ? null : EscapeLike(root.TrimEnd('\\')+"\\")+"%"));
         using var reader = command.ExecuteReader(); var result = new List<Breakdown>(); while (reader.Read()) result.Add(new(reader.GetString(0), reader.GetInt64(1), reader.GetInt64(2))); return result;
     }
-    public List<Breakdown> Extensions(long snapshot)
+    public List<Breakdown> Extensions(long snapshot, string? root = null)
     {
-        using var command = Command("SELECT extension,SUM(length),COUNT(*) FROM entries WHERE snapshot=$s AND isdir=0 GROUP BY extension ORDER BY SUM(length) DESC LIMIT 100;", ("$s", snapshot));
+        using var command = Command("SELECT extension,SUM(length),COUNT(*) FROM entries WHERE snapshot=$s AND ($root IS NULL OR root=$root) AND isdir=0 GROUP BY extension ORDER BY SUM(length) DESC LIMIT 100;", ("$s", snapshot), ("$root", root));
         using var reader = command.ExecuteReader(); var result = new List<Breakdown>(); while (reader.Read()) result.Add(new(reader.GetString(0), reader.GetInt64(1), reader.GetInt64(2))); return result;
     }
     public List<ScanError> Errors(long snapshot)
@@ -154,24 +179,30 @@ public sealed class IndexStore : IDisposable
         Execute("INSERT OR REPLACE INTO hashes VALUES($p,$a,$sample,$id,$l,$m,$c,$h);", ("$p", result.Path), ("$a", request.Algorithm), ("$sample", request.Sample ? 1 : 0), ("$id", result.Identity), ("$l", result.Length), ("$m", result.ModifiedTicks), ("$c", result.ChangeTicks), ("$h", result.Hash));
     }
     public void ClearDuplicates(long snapshot) => Execute("DELETE FROM duplicates WHERE snapshot=$s;", ("$s", snapshot));
-    public void AddDuplicate(long snapshot, long group, string path, string evidence, bool keeper) => Execute("INSERT OR REPLACE INTO duplicates VALUES($s,$g,$p,$e,$k);", ("$s", snapshot), ("$g", group), ("$p", path), ("$e", evidence), ("$k", keeper ? 1 : 0));
-    public void FindNameDuplicates(long destination, long[] snapshots)
+    public void AddDuplicate(long snapshot, long group, string path, string evidence, bool keeper) => Execute("INSERT OR REPLACE INTO duplicates VALUES($s,$g,$p,$e,$k,(SELECT MAX(snapshot) FROM entries WHERE path=$p));", ("$s", snapshot), ("$g", group), ("$p", path), ("$e", evidence), ("$k", keeper ? 1 : 0));
+    public void FindNameDuplicates(long destination, long[] snapshots, string[]? roots=null)
     {
-        ClearDuplicates(destination); var ids = string.Join(',', snapshots); if (ids.Length == 0) return;
+        ClearDuplicates(destination); var ids=string.Join(',',snapshots);if(ids.Length==0)return;
+        var rootSql=roots is { Length:>0 }?" AND root IN("+string.Join(',',roots.Select((_,i)=>"$root"+i))+")":"";
+        var parameters=new List<(string Name,object? Value)>{("$s",destination)};
+        if(roots!=null)parameters.AddRange(roots.Select((value,i)=>("$root"+i,(object?)value)));
         Execute($"""
-        INSERT OR REPLACE INTO duplicates
-        SELECT $s,DENSE_RANK() OVER(ORDER BY e.name_key),e.path,'Name candidate',CASE WHEN ROW_NUMBER() OVER(PARTITION BY e.name_key ORDER BY e.path)=1 THEN 1 ELSE 0 END
-        FROM entries e WHERE e.snapshot IN({ids}) AND e.isdir=0 AND e.name_key IN(SELECT name_key FROM entries WHERE snapshot IN({ids}) AND isdir=0 GROUP BY name_key HAVING COUNT(DISTINCT COALESCE(identity,path))>1) GROUP BY COALESCE(e.identity,e.path);
-        """, ("$s", destination));
+        WITH chosen AS(SELECT e.* FROM entries e WHERE e.snapshot IN({ids}) AND e.isdir=0 {rootSql}
+        AND e.snapshot=(SELECT MAX(snapshot) FROM entries WHERE path=e.path AND snapshot IN({ids}) {rootSql})),
+        physical AS(SELECT * FROM chosen GROUP BY COALESCE(identity,path))
+        INSERT OR REPLACE INTO duplicates SELECT $s,DENSE_RANK() OVER(ORDER BY name_key),path,'Name candidate',
+        CASE WHEN ROW_NUMBER() OVER(PARTITION BY name_key ORDER BY path)=1 THEN 1 ELSE 0 END,snapshot
+        FROM physical WHERE name_key IN(SELECT name_key FROM physical GROUP BY name_key HAVING COUNT(*)>1);
+        """,parameters.ToArray());
     }
     public List<DuplicateRow> Duplicates(long snapshot, int page = 0)
     {
-        using var command = Command($"SELECT d.groupid,{EntryColumns},d.evidence,d.keeper FROM duplicates d JOIN entries e ON e.path=d.path WHERE d.snapshot=$s GROUP BY d.path ORDER BY d.groupid,d.keeper DESC,d.path LIMIT 250 OFFSET $offset;", ("$s", snapshot), ("$offset", Math.Max(0,page)*250));
+        using var command = Command($"SELECT d.groupid,{EntryColumns},d.evidence,d.keeper FROM duplicates d JOIN entries e ON e.path=d.path AND e.snapshot=d.source WHERE d.snapshot=$s GROUP BY d.path ORDER BY d.groupid,d.keeper DESC,d.path LIMIT 250 OFFSET $offset;", ("$s", snapshot), ("$offset", Math.Max(0,page)*250));
         using var reader = command.ExecuteReader(); var result = new List<DuplicateRow>(); while (reader.Read()) result.Add(new(reader.GetInt64(0), Entry(reader,1), reader.GetString(11), reader.GetInt64(12)!=0)); return result;
     }
     public List<FileEntry> DuplicateGroup(long snapshot, long group)
     {
-        using var command = Command($"SELECT {EntryColumns} FROM duplicates d JOIN entries e ON e.path=d.path WHERE d.snapshot=$s AND d.groupid=$g GROUP BY d.path ORDER BY d.keeper DESC,d.path LIMIT 10000;", ("$s", snapshot), ("$g", group)); using var reader=command.ExecuteReader(); var result=new List<FileEntry>(); while(reader.Read())result.Add(Entry(reader)); return result;
+        using var command = Command($"SELECT {EntryColumns} FROM duplicates d JOIN entries e ON e.path=d.path AND e.snapshot=d.source WHERE d.snapshot=$s AND d.groupid=$g GROUP BY d.path ORDER BY d.keeper DESC,d.path LIMIT 10000;", ("$s", snapshot), ("$g", group)); using var reader=command.ExecuteReader(); var result=new List<FileEntry>(); while(reader.Read())result.Add(Entry(reader)); return result;
     }
     public List<Difference> Compare(long before, long after, int page = 0)
     {
@@ -192,7 +223,7 @@ public sealed class IndexStore : IDisposable
     }
     public void Export(long snapshot, string path, bool json)
     {
-        using var stream=File.Create(path);
+        using var stream=new FileStream(path,FileMode.CreateNew,FileAccess.Write);
         using var command=Command($"SELECT {EntryColumns} FROM entries e WHERE snapshot=$s ORDER BY e.path;", ("$s",snapshot)); using var reader=command.ExecuteReader();
         if(json) { using var writer=new Utf8JsonWriter(stream,new JsonWriterOptions { Indented=true }); writer.WriteStartArray(); while(reader.Read())JsonSerializer.Serialize(writer,Entry(reader)); writer.WriteEndArray(); }
         else { using var writer=new StreamWriter(stream,new System.Text.UTF8Encoding(true)); writer.WriteLine("Path,Directory,LogicalBytes,AllocatedBytes,Identity,ModifiedUtc"); while(reader.Read()) { var item=Entry(reader); writer.WriteLine($"{Csv(item.Path)},{item.IsDirectory},{item.Length},{item.Allocated?.ToString() ?? ""},{Csv(item.Identity ?? "")},{(item.ModifiedTicks>0?new DateTime(item.ModifiedTicks,DateTimeKind.Utc).ToString("O"):"")}"); } }
