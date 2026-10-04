@@ -15,6 +15,7 @@ public class IndexTests
     {
         using var fixture=new Fixture();var first=System.IO.Path.Combine(fixture.Root,"one");var second=System.IO.Path.Combine(fixture.Root,"two");fixture.Write("one/a.bin","123");fixture.Write("two/b.txt","1234567");
         using var store=new IndexStore(System.IO.Path.Combine(fixture.Root,"index.db"));var id=await Scan(store,first,second);
+        Assert.Contains(store.PrimaryQueryPlan(id,first),x=>x.Contains($"entry_{id}_size",StringComparison.Ordinal));
         Assert.Equal(3,store.GetSummary(id,first).Logical);Assert.Equal(7,store.GetSummary(id,second).Logical);
         Assert.Equal("a.bin",Assert.Single(store.Query(id,new(Root:first))).Name);Assert.Equal(".txt",Assert.Single(store.Extensions(id,second)).Name);
     }

@@ -37,6 +37,7 @@ public class ScannerTests
         using var fixture=new Fixture(); var a=fixture.Write("a.txt","identical"); var b=fixture.Write("b.txt","identical");
         var ea=Native.ReadEntry(a); var eb=Native.ReadEntry(b);
         Assert.Equal((await Hashing.HashAsync(new(ea,"SHA-256"))).Hash,(await Hashing.HashAsync(new(eb,"SHA-256"))).Hash);
+        Assert.NotNull((await Hashing.HashAsync(new(ea with { Identity="replaced-file" },"SHA-256"))).Error);
         File.AppendAllText(a,"changed"); Assert.NotNull((await Hashing.HashAsync(new(ea,"SHA-256"))).Error);
     }
     [Fact] public void OverlappingRootsAreDeduplicated() => Assert.Single(Paths.DistinctRoots([@"C:\data",@"C:\data\child",@"C:\DATA"]));

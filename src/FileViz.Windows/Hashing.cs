@@ -17,7 +17,7 @@ public static class Hashing
         {
             var entry = Native.ReadEntry(request.Entry.Path);
             if (entry.IsDirectory || entry.IsPlaceholder || entry.IsReparse) throw new IOException("Directories, reparse points and offline placeholders are not hashed.");
-            if (entry.Length != request.Entry.Length || entry.ModifiedTicks != request.Entry.ModifiedTicks || (request.Entry.ChangeTicks != 0 && entry.ChangeTicks != request.Entry.ChangeTicks)) throw new IOException("File changed since the scan; rescan first.");
+            if ((request.Entry.Identity != null && entry.Identity != request.Entry.Identity) || entry.Length != request.Entry.Length || entry.ModifiedTicks != request.Entry.ModifiedTicks || (request.Entry.ChangeTicks != 0 && entry.ChangeTicks != request.Entry.ChangeTicks)) throw new IOException("File changed since the scan; rescan first.");
             using var handle = Native.CreateFileW(Native.LongPath(entry.Path), 0x80000000, 1, IntPtr.Zero, 3, Native.BackupSemantics | Native.OpenReparsePoint, IntPtr.Zero);
             if (handle.IsInvalid) throw new Win32Exception(System.Runtime.InteropServices.Marshal.GetLastWin32Error());
             var opened = Native.ReadEntry(handle, entry.Path);

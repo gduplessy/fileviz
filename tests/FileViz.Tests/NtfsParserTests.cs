@@ -39,6 +39,14 @@ public class NtfsParserTests
             try { NtfsParser.Parse(bytes,512,42); } catch(InvalidDataException) { } catch(OverflowException) { }
         }
     }
+    [Fact] public void RootDotNameIsValidOnlyForTheRootRecord()
+    {
+        var bytes=Record();Put32(bytes,24,160);Put32(bytes,56,0x30);Put32(bytes,60,96);
+        Put32(bytes,72,68);Put16(bytes,76,24);bytes[56+24+64]=1;bytes[56+24+65]=3;
+        Put16(bytes,56+24+66,'.');Put32(bytes,152,uint.MaxValue);
+        Assert.Equal(".",Assert.Single(NtfsParser.Parse(bytes,512,5).Names).Name);
+        Assert.Throws<InvalidDataException>(()=>NtfsParser.Parse(bytes,512,42));
+    }
     private static void Put16(byte[] bytes,int offset,ushort value)=>BinaryPrimitives.WriteUInt16LittleEndian(bytes.AsSpan(offset),value);
     private static void Put32(byte[] bytes,int offset,uint value)=>BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(offset),value);
 }

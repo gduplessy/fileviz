@@ -44,7 +44,7 @@ public static class NtfsParser
             {
                 var valueLength=U32(attr,16); var valueOffset=U16(attr,20);
                 if(valueOffset<24 || valueOffset+(long)valueLength>attr.Length) throw Bad("Resident bounds");
-                value=attr.Slice(valueOffset,(int)valueLength).ToArray(); size=valueLength;
+                value=attr.Slice(valueOffset,(int)valueLength).ToArray(); size=valueLength; allocated=((long)valueLength+7)&~7L;
             }
             else if(form==1)
             {
@@ -69,7 +69,7 @@ public static class NtfsParser
             else if(type==0x30 && value!=null)
             {
                 if(value.Length<66) throw Bad("File name header"); var space=value[65]; var filename=ReadName(value,66,value[64]);
-                if(filename.Length==0 || filename is "." or ".." || filename.IndexOfAny(['\\','/','\0'])>=0 || space>3) throw Bad("File name");
+                if(filename.Length==0 || (filename==".." || (filename=="." && index!=5)) || filename.IndexOfAny(['\\','/','\0'])>=0 || space>3) throw Bad("File name");
                 if(space!=2) names.Add(new(U64(value,0),filename,space));
             }
             else if(type==0x20 && value!=null) refs.AddRange(ParseAttributeList(value));

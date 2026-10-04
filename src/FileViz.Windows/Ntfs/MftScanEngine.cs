@@ -16,7 +16,7 @@ public sealed class MftScanEngine : IScanEngine
         using var reader=new MftReader(root);
         // Only directory ancestry stays in memory. A cap forces streaming directory enumeration for unusually directory-heavy volumes.
         var directories=new Dictionary<ulong,NtfsName>(); var counter=0L;
-        foreach(var record in reader.Records(cancellationToken))
+        foreach(var record in reader.Records(cancellationToken,true))
         {
             if(record.InUse && record.IsDirectory && record.BaseReference==0 && (record.Reference&NtfsParser.ReferenceMask)!=5)
             {
@@ -145,7 +145,7 @@ internal sealed class MftReader : IDisposable
         }
         finally{stream.Position=savedPosition;}
     }
-    public IEnumerable<NtfsRecord> Records(CancellationToken token)
+    public IEnumerable<NtfsRecord> Records(CancellationToken token,bool directoriesOnly=false)
     {
         var buffer=new byte[1024*1024];long index=0,remaining=length;
         foreach(var run in runs)
@@ -163,6 +163,8 @@ internal sealed class MftReader : IDisposable
                         if(buffer.AsSpan(offset,recordSize).IndexOfAnyExcept((byte)0)>=0)throw new InvalidDataException("Invalid MFT record signature.");
                         continue;
                     }
+                    var flags=BitConverter.ToUInt16(buffer,offset+22);
+                    if((flags&1)==0 || (directoriesOnly && (flags&2)==0))continue;
                     yield return NtfsParser.Parse(buffer.AsSpan(offset,recordSize),sectorSize,(ulong)index);
                 }
                 bytes-=count;remaining-=count;

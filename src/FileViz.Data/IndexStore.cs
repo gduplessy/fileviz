@@ -13,20 +13,15 @@ public sealed partial class IndexStore : IDisposable
         DatabasePath = System.IO.Path.GetFullPath(path); Directory.CreateDirectory(System.IO.Path.GetDirectoryName(DatabasePath)!);
         connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = DatabasePath, Mode = SqliteOpenMode.ReadWriteCreate, Pooling = false }.ToString());
         connection.Open();
-        Execute("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA cache_size=-32768; PRAGMA temp_store=FILE; PRAGMA busy_timeout=5000; PRAGMA foreign_keys=ON;");
+        Execute("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA cache_size=-32768; PRAGMA temp_store=FILE; PRAGMA busy_timeout=5000; PRAGMA wal_autocheckpoint=10000; PRAGMA foreign_keys=ON;");
         Execute("""
         CREATE TABLE IF NOT EXISTS snapshots(id INTEGER PRIMARY KEY,roots TEXT NOT NULL,started TEXT NOT NULL,state TEXT NOT NULL,files INTEGER NOT NULL DEFAULT 0,logical INTEGER NOT NULL DEFAULT 0,allocated INTEGER,errors INTEGER NOT NULL DEFAULT 0);
         CREATE TABLE IF NOT EXISTS entries(snapshot INTEGER NOT NULL REFERENCES snapshots(id) ON DELETE CASCADE,path TEXT NOT NULL,parent TEXT NOT NULL,name TEXT NOT NULL,name_key TEXT NOT NULL,identity TEXT,isdir INTEGER NOT NULL,length INTEGER NOT NULL,allocated INTEGER,modified INTEGER NOT NULL,changed INTEGER NOT NULL,attrs INTEGER NOT NULL,extension TEXT NOT NULL,root TEXT NOT NULL,PRIMARY KEY(snapshot,path));
-        CREATE INDEX IF NOT EXISTS entries_size ON entries(snapshot,isdir,length DESC);
-        CREATE INDEX IF NOT EXISTS entries_parent ON entries(snapshot,parent);
-        CREATE INDEX IF NOT EXISTS entries_name ON entries(snapshot,name_key);
-        CREATE INDEX IF NOT EXISTS entries_identity ON entries(snapshot,identity);
-        CREATE INDEX IF NOT EXISTS entries_extension ON entries(snapshot,extension,length DESC);
         CREATE TABLE IF NOT EXISTS errors(snapshot INTEGER NOT NULL REFERENCES snapshots(id) ON DELETE CASCADE,path TEXT NOT NULL,message TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS folders(snapshot INTEGER NOT NULL REFERENCES snapshots(id) ON DELETE CASCADE,path TEXT NOT NULL,parent TEXT NOT NULL,depth INTEGER NOT NULL,root TEXT NOT NULL,logical INTEGER NOT NULL DEFAULT 0,allocated INTEGER NOT NULL DEFAULT 0,files INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(snapshot,path));
         CREATE TABLE IF NOT EXISTS root_totals(snapshot INTEGER NOT NULL REFERENCES snapshots(id) ON DELETE CASCADE,root TEXT NOT NULL,files INTEGER NOT NULL,folders INTEGER NOT NULL,logical INTEGER NOT NULL,allocated INTEGER NOT NULL,unknown INTEGER NOT NULL,PRIMARY KEY(snapshot,root));
-        CREATE INDEX IF NOT EXISTS entries_root_size ON entries(snapshot,root,isdir,length DESC,path);
-        CREATE INDEX IF NOT EXISTS entries_root_allocated ON entries(snapshot,root,isdir,allocated DESC,path);
+        CREATE TABLE IF NOT EXISTS extension_totals(snapshot INTEGER NOT NULL REFERENCES snapshots(id) ON DELETE CASCADE,root TEXT NOT NULL,extension TEXT NOT NULL,logical INTEGER NOT NULL,files INTEGER NOT NULL,PRIMARY KEY(snapshot,root,extension));
+        CREATE INDEX IF NOT EXISTS extension_rank ON extension_totals(snapshot,root,logical DESC);
         CREATE INDEX IF NOT EXISTS errors_snapshot ON errors(snapshot);
         CREATE INDEX IF NOT EXISTS folders_rank ON folders(snapshot,root,logical DESC);
         CREATE INDEX IF NOT EXISTS folders_depth ON folders(snapshot,depth,parent);
@@ -65,11 +60,13 @@ public sealed partial class IndexStore : IDisposable
     }
     public void Finish(long snapshot, string state)
     {
+        CreateQueryIndexes(snapshot);
         RebuildFolders(snapshot);
         var summary = GetSummaryRaw(snapshot);
         CacheSummaries(snapshot,summary);
         Execute("UPDATE snapshots SET state=$state,files=$files,logical=$logical,allocated=$allocated,errors=$errors WHERE id=$s;",
             ("$state", summary.Errors > 0 && state == "Complete" ? "Partial" : state), ("$files", summary.Files), ("$logical", summary.Logical), ("$allocated", summary.Allocated), ("$errors", summary.Errors), ("$s", snapshot));
+        Execute("PRAGMA wal_checkpoint(TRUNCATE);");
     }
     public void SetState(long snapshot, string state) => Execute("UPDATE snapshots SET state=$state WHERE id=$s;", ("$state", state), ("$s", snapshot));
     public Summary GetSummary(long snapshot,string? root=null)
@@ -80,7 +77,8 @@ public sealed partial class IndexStore : IDisposable
     }
     private void CacheSummaries(long snapshot,Summary summary)
     {
-        Execute("DELETE FROM root_totals WHERE snapshot=$s;",("$s",snapshot));
+        Execute("DELETE FROM root_totals WHERE snapshot=$s; DELETE FROM extension_totals WHERE snapshot=$s;",("$s",snapshot));
+        Execute("INSERT INTO extension_totals SELECT $s,root,extension,SUM(length),COUNT(*) FROM entries WHERE snapshot=$s AND isdir=0 GROUP BY root,extension; INSERT INTO extension_totals SELECT $s,'',extension,SUM(logical),SUM(files) FROM extension_totals WHERE snapshot=$s GROUP BY extension;",("$s",snapshot));
         Execute("""
         WITH counts AS(SELECT root,SUM(CASE WHEN isdir=0 THEN 1 ELSE 0 END) f,SUM(isdir) d,SUM(CASE WHEN isdir=0 THEN length ELSE 0 END) l,SUM(CASE WHEN isdir=0 AND allocated IS NULL THEN 1 ELSE 0 END) u FROM entries WHERE snapshot=$s GROUP BY root),
         allocation AS(SELECT root,SUM(a) a FROM(SELECT root,MAX(allocated) a FROM entries WHERE snapshot=$s AND isdir=0 GROUP BY root,COALESCE(identity,path))GROUP BY root)
@@ -101,6 +99,24 @@ public sealed partial class IndexStore : IDisposable
         using var reader = command.ExecuteReader(); reader.Read();
         long Value(int index) => reader.IsDBNull(index) ? 0 : reader.GetInt64(index);
         return new(Value(0), Value(1), Value(2), Value(3), Value(4), Value(5));
+    }
+    private void CreateQueryIndexes(long snapshot)
+    {
+        // Existing snapshots keep their indexes. New rows do not satisfy old index predicates,
+        // so scanning does not update six large B-trees for every incoming file.
+        var definitions=new Dictionary<string,string>
+        {
+            ["parent"]="parent,length DESC,path",["parent_allocated"]="parent,allocated DESC,path",
+            ["size"]="root,isdir,length DESC,path",["allocated"]="root,isdir,allocated DESC,path",
+            ["identity"]="identity,path,allocated",["name"]="name_key,path",["extension"]="root,extension,length DESC"
+        };
+        foreach(var item in definitions)Execute($"CREATE INDEX IF NOT EXISTS entry_{snapshot}_{item.Key} ON entries({item.Value}) WHERE snapshot={snapshot};");
+        Execute("PRAGMA analysis_limit=1000; ANALYZE entries;");
+    }
+    public List<string> PrimaryQueryPlan(long snapshot,string root)
+    {
+        using var command=Command($"EXPLAIN QUERY PLAN SELECT path FROM entries WHERE snapshot={snapshot} AND root=$root AND isdir=0 ORDER BY length DESC,path LIMIT 250;",("$root",root));
+        using var reader=command.ExecuteReader();var result=new List<string>();while(reader.Read())result.Add(reader.GetString(3));return result;
     }
     private void RebuildFolders(long snapshot)
     {
@@ -132,7 +148,7 @@ public sealed partial class IndexStore : IDisposable
     private static FileEntry Entry(SqliteDataReader reader, int start = 0) => new(reader.GetString(start), reader.GetString(start+1), reader.GetString(start+2), reader.IsDBNull(start+3) ? null : reader.GetString(start+3), reader.GetInt64(start+4) != 0, reader.GetInt64(start+5), reader.IsDBNull(start+6) ? null : reader.GetInt64(start+6), reader.GetInt64(start+7), reader.GetInt64(start+8), (uint)reader.GetInt64(start+9));
     public List<FileEntry> Query(long snapshot, QueryFilter filter, int page = 0, int pageSize = 250, bool filesOnly = true)
     {
-        var where = "e.snapshot=$s" + (filesOnly ? " AND e.isdir=0" : "");
+        var where = $"e.snapshot={snapshot}" + (filesOnly ? " AND e.isdir=0" : "");
         using var command = connection.CreateCommand(); command.Parameters.AddWithValue("$s", snapshot);
         if (filter.Root != null) { where += " AND e.root=$root"; command.Parameters.AddWithValue("$root", filter.Root); }
         if (filter.Search.Length > 0) { where += " AND e.path LIKE $search ESCAPE '!'"; command.Parameters.AddWithValue("$search", "%" + EscapeLike(filter.Search) + "%"); }
@@ -152,7 +168,7 @@ public sealed partial class IndexStore : IDisposable
     }
     public List<Breakdown> Extensions(long snapshot, string? root = null)
     {
-        using var command = Command("SELECT extension,SUM(length),COUNT(*) FROM entries WHERE snapshot=$s AND ($root IS NULL OR root=$root) AND isdir=0 GROUP BY extension ORDER BY SUM(length) DESC LIMIT 100;", ("$s", snapshot), ("$root", root));
+        using var command = Command("SELECT extension,logical,files FROM extension_totals WHERE snapshot=$s AND root=COALESCE($root,'') ORDER BY logical DESC LIMIT 100;", ("$s", snapshot), ("$root", root));
         using var reader = command.ExecuteReader(); var result = new List<Breakdown>(); while (reader.Read()) result.Add(new(reader.GetString(0), reader.GetInt64(1), reader.GetInt64(2))); return result;
     }
     public List<ScanError> Errors(long snapshot)
@@ -230,7 +246,15 @@ public sealed partial class IndexStore : IDisposable
     }
     private static string Csv(string value) => "\"" + (value.Length>0 && "=+-@".Contains(value[0]) ? "'" : "") + value.Replace("\"","\"\"") + "\"";
     private static string EscapeLike(string value)=>value.Replace("!","!!").Replace("%","!%").Replace("_","!_");
-    private SqliteCommand Command(string sql, params (string Name, object? Value)[] parameters) { var command=connection.CreateCommand(); command.CommandText=sql; foreach(var item in parameters)command.Parameters.AddWithValue(item.Name,item.Value ?? DBNull.Value); return command; }
+    private SqliteCommand Command(string sql, params (string Name, object? Value)[] parameters)
+    {
+        // A literal snapshot constraint lets SQLite prove the per-snapshot partial-index predicate.
+        var snapshot=parameters.FirstOrDefault(x=>x.Name=="$s");
+        if(snapshot.Value is long or int)sql=System.Text.RegularExpressions.Regex.Replace(sql,@"\$s\b",Convert.ToInt64(snapshot.Value).ToString(System.Globalization.CultureInfo.InvariantCulture));
+        var command=connection.CreateCommand();command.CommandText=sql;
+        foreach(var item in parameters)if(item.Name!="$s" || snapshot.Value is not (long or int))command.Parameters.AddWithValue(item.Name,item.Value??DBNull.Value);
+        return command;
+    }
     private void Execute(string sql, params (string Name, object? Value)[] parameters) { using var command=Command(sql,parameters); command.ExecuteNonQuery(); }
     private object? Scalar(string sql, params (string Name, object? Value)[] parameters) { using var command=Command(sql,parameters); var result=command.ExecuteScalar(); return result==DBNull.Value?null:result; }
     public void Dispose()=>connection.Dispose();
