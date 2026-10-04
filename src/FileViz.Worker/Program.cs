@@ -19,7 +19,7 @@ try
                 foreach (var scope in scopes)
                 {
                     if (!Path.IsPathFullyQualified(scope.Root) || scope.Root.StartsWith(@"\\.\", StringComparison.Ordinal) || scope.Exclusions.Length > 256) throw new InvalidDataException("Invalid scan scope.");
-                    IScanEngine engine = new DirectoryScanEngine();
+                    IScanEngine engine = new FileViz.Windows.Ntfs.AutoScanEngine();
                     await foreach (var batch in engine.ScanAsync(scope)) await Wire.WriteAsync(pipe, new WorkerMessage("batch", Batch: batch));
                 }
             }
