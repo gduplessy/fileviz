@@ -84,11 +84,12 @@ public sealed class ShellViewModel : Bindable, IDisposable
             }
         }
     }
+    private bool refreshingHistory;
     private SnapshotRow? selectedSnapshot; public SnapshotRow? SelectedSnapshot
     {
         get => selectedSnapshot; set
         {
-            if (!Set(ref selectedSnapshot, value))
+            if (refreshingHistory || !Set(ref selectedSnapshot, value))
                 return;
             active = value?.Value.Id ?? 0;
             page = 0;
@@ -519,7 +520,9 @@ public sealed class ShellViewModel : Bindable, IDisposable
     {
         var id = active;
         var comparisonId = CompareBefore?.Value.Id;
-        Replace(History, store.Snapshots().Select(x => new SnapshotRow(x)));
+        refreshingHistory = true;
+        try { Replace(History, store.Snapshots().Select(x => new SnapshotRow(x))); }
+        finally { refreshingHistory = false; }
         selectedSnapshot = History.FirstOrDefault(x => x.Value.Id == id);
         Changed(nameof(SelectedSnapshot));
         CompareBefore = History.FirstOrDefault(x => x.Value.Id == comparisonId) ?? History.Skip(1).FirstOrDefault();
