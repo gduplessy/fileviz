@@ -81,4 +81,11 @@ public class ScannerTests
         using var stream = new MemoryStream(BitConverter.GetBytes(Wire.MaximumFrame + 1));
         await Assert.ThrowsAsync<InvalidDataException>(() => Wire.ReadAsync<WorkerMessage>(stream));
     }
+    [Fact]
+    public void WholeDriveRootsContainDescendantsAndCollapseOverlappingFolders()
+    {
+        Assert.True(Paths.Within(@"C:\data\child", @"C:\"));
+        Assert.False(Paths.Within(@"C:\database", @"C:\data"));
+        Assert.Single(Paths.DistinctRoots([@"C:\", @"C:\data"]));
+    }
 }

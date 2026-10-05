@@ -43,20 +43,31 @@ public static class Native
     [DllImport("advapi32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool AdjustTokenPrivileges(SafeAccessTokenHandle token, bool disable, ref TokenPrivileges privileges, int size, IntPtr previous, IntPtr returned);
-    [StructLayout(LayoutKind.Sequential)] private struct TokenPrivileges { public uint Count; public long Luid; public uint Attributes; }
-    [StructLayout(LayoutKind.Sequential)] public struct HandleInfo
+    [StructLayout(LayoutKind.Sequential)]
+    private struct TokenPrivileges
+    {
+        public uint Count; public long Luid; public uint Attributes;
+    }
+    [StructLayout(LayoutKind.Sequential)]
+    public struct HandleInfo
     {
         public uint Attributes; public uint CreationLow, CreationHigh, AccessLow, AccessHigh, WriteLow, WriteHigh;
         public uint VolumeSerial, SizeHigh, SizeLow, Links, IndexHigh, IndexLow;
     }
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool PeekNamedPipe(Microsoft.Win32.SafeHandles.SafePipeHandle pipe, IntPtr buffer, uint size, IntPtr read, IntPtr available, IntPtr left);
     public static bool IsElevated => new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator);
     public static void EnableBackupPrivilege()
     {
-        if (!IsElevated) return;
-        if (!OpenProcessToken(System.Diagnostics.Process.GetCurrentProcess().Handle, 0x28, out var token)) return;
+        if (!IsElevated)
+            return;
+        if (!OpenProcessToken(System.Diagnostics.Process.GetCurrentProcess().Handle, 0x28, out var token))
+            return;
         using (token)
         {
-            if (!LookupPrivilegeValueW(null, "SeBackupPrivilege", out var luid)) return;
+            if (!LookupPrivilegeValueW(null, "SeBackupPrivilege", out var luid))
+                return;
             var value = new TokenPrivileges { Count = 1, Luid = luid, Attributes = 2 };
             AdjustTokenPrivileges(token, false, ref value, 0, IntPtr.Zero, IntPtr.Zero);
         }
@@ -65,46 +76,70 @@ public static class Native
     public static string ResolveNetwork(string path)
     {
         path = Paths.Normalize(path);
-        if (path.Length < 2 || path[1] != ':') return path;
-        var remote = new StringBuilder(32768); var length = remote.Capacity;
+        if (path.Length < 2 || path[1] != ':')
+            return path;
+        var remote = new StringBuilder(32768);
+        var length = remote.Capacity;
         return WNetGetConnectionW(path[..2], remote, ref length) == 0 ? Paths.Normalize(remote + path[2..]) : path;
     }
     public static string VolumeRoot(string path)
     {
-        if (path.StartsWith(@"\\", StringComparison.Ordinal)) return System.IO.Path.GetPathRoot(path)!;
+        if (path.StartsWith(@"\\", StringComparison.Ordinal))
+            return System.IO.Path.GetPathRoot(path)!;
         var root = new StringBuilder(32768);
         return GetVolumePathNameW(LongPath(path), root, root.Capacity) ? root.ToString().Replace(@"\\?\", "") : System.IO.Path.GetPathRoot(path)!;
     }
     public static string VolumeName(string path)
     {
-        var root = VolumeRoot(path); var name = new StringBuilder(128);
+        var root = VolumeRoot(path);
+        var name = new StringBuilder(128);
         return GetVolumeNameForVolumeMountPointW(root, name, name.Capacity) ? name.ToString() : root;
     }
     public static FileEntry ReadEntry(string path, uint access = 0, uint share = 7)
     {
         using var handle = CreateFileW(LongPath(path), access, share, IntPtr.Zero, 3, BackupSemantics | OpenReparsePoint, IntPtr.Zero);
-        if (handle.IsInvalid) throw new Win32Exception(Marshal.GetLastWin32Error(), path);
+        if (handle.IsInvalid)
+            throw new Win32Exception(Marshal.GetLastWin32Error(), path);
         return ReadEntry(handle, path);
     }
     public static FileEntry ReadEntry(SafeFileHandle handle, string path)
     {
-        if (!GetFileInformationByHandle(handle, out var info)) throw new Win32Exception(Marshal.GetLastWin32Error());
+        if (!GetFileInformationByHandle(handle, out var info))
+            throw new Win32Exception(Marshal.GetLastWin32Error());
         var buffer = Marshal.AllocHGlobal(40);
         try
         {
-            string? identity = null; long? allocated = null; long changed = 0;
+            string? identity = null;
+            long? allocated = null;
+            long changed = 0;
             if (GetFileInformationByHandleEx(handle, 18, buffer, 24))
                 identity = VolumeName(path) + ":" + Convert.ToHexString(ReadBuffer(buffer + 8, 16));
             else if (info.IndexHigh != 0 || info.IndexLow != 0)
                 identity = info.VolumeSerial.ToString("x8") + ":" + (((ulong)info.IndexHigh << 32) | info.IndexLow).ToString("x16");
-            if (GetFileInformationByHandleEx(handle, 1, buffer, 24)) allocated = Marshal.ReadInt64(buffer);
-            if (GetFileInformationByHandleEx(handle, 0, buffer, 40)) changed = FileTime(Marshal.ReadInt64(buffer, 24));
+            if (GetFileInformationByHandleEx(handle, 1, buffer, 24))
+                allocated = Marshal.ReadInt64(buffer);
+            if (GetFileInformationByHandleEx(handle, 0, buffer, 40))
+                changed = FileTime(Marshal.ReadInt64(buffer, 24));
             return new FileEntry(path, System.IO.Path.GetDirectoryName(path) ?? path, System.IO.Path.GetFileName(path), identity,
                 (info.Attributes & 16) != 0, checked((long)(((ulong)info.SizeHigh << 32) | info.SizeLow)), allocated,
                 FileTime(((long)info.WriteHigh << 32) | info.WriteLow), changed, info.Attributes);
         }
         finally { Marshal.FreeHGlobal(buffer); }
     }
-    public static byte[] ReadBuffer(IntPtr ptr, int size) { var value = new byte[size]; Marshal.Copy(ptr, value, 0, size); return value; }
-    public static long FileTime(long value) { try { return DateTime.FromFileTimeUtc(value).Ticks; } catch (ArgumentOutOfRangeException) { return 0; } }
+    public static byte[] ReadBuffer(IntPtr ptr, int size)
+    {
+        var value = new byte[size];
+        Marshal.Copy(ptr, value, 0, size);
+        return value;
+    }
+    public static long FileTime(long value)
+    {
+        if (value <= 0)
+            return 0;
+        try
+        {
+            return DateTime.FromFileTimeUtc(value).Ticks;
+        }
+        catch (ArgumentOutOfRangeException) { return 0; }
+    }
 }

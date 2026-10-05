@@ -8,7 +8,12 @@ public sealed class WorkerSession : IAsyncDisposable
 {
     private readonly NamedPipeServerStream pipe;
     private readonly Process process;
-    private WorkerSession(NamedPipeServerStream pipe, Process process) { this.pipe = pipe; this.process = process; }
+    private WorkerSession(NamedPipeServerStream pipe, Process process)
+    {
+        this.pipe = pipe;
+        this.process = process;
+    }
+    public int ProcessId => process.Id;
     public static async Task<WorkerSession> StartAsync(bool elevate, CancellationToken token = default)
     {
         var name = "FileViz-" + Guid.NewGuid().ToString("N");
@@ -17,18 +22,34 @@ public sealed class WorkerSession : IAsyncDisposable
         try
         {
             var executable = System.IO.Path.Combine(AppContext.BaseDirectory, "worker", "FileViz.Worker.exe");
-            if (!File.Exists(executable)) executable = System.IO.Path.Combine(AppContext.BaseDirectory, "FileViz.Worker.exe");
-            if (!File.Exists(executable)) throw new FileNotFoundException("Worker is missing; use the complete release package.", executable);
+            if (!File.Exists(executable))
+                executable = System.IO.Path.Combine(AppContext.BaseDirectory, "FileViz.Worker.exe");
+            if (!File.Exists(executable))
+                throw new FileNotFoundException("Worker is missing; use the complete release package.", executable);
             var info = new ProcessStartInfo(executable) { UseShellExecute = elevate && !Native.IsElevated, CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden };
-            if (info.UseShellExecute) info.Verb = "runas";
-            info.ArgumentList.Add("--pipe"); info.ArgumentList.Add(name); info.ArgumentList.Add("--parent"); info.ArgumentList.Add(Environment.ProcessId.ToString());
+            if (info.UseShellExecute)
+                info.Verb = "runas";
+            info.ArgumentList.Add("--pipe");
+            info.ArgumentList.Add(name);
+            info.ArgumentList.Add("--parent");
+            info.ArgumentList.Add(Environment.ProcessId.ToString());
             process = Process.Start(info) ?? throw new IOException("Could not launch worker.");
-            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token); timeout.CancelAfter(TimeSpan.FromSeconds(60));
-            await pipe.WaitForConnectionAsync(timeout.Token);
-            if (!Native.GetNamedPipeClientProcessId(pipe.SafePipeHandle, out var pid) || pid != process.Id) throw new UnauthorizedAccessException("Worker process identity mismatch.");
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+            timeout.CancelAfter(TimeSpan.FromSeconds(60));
+            var connected = pipe.WaitForConnectionAsync(timeout.Token);
+            var exited = process.WaitForExitAsync(timeout.Token);
+            if (await Task.WhenAny(connected, exited) == exited)
+            {
+                await exited;
+                throw new IOException("Worker exited before authentication. Elevation must use the same Windows identity; another-account UAC requires running the entire application as that administrator.");
+            }
+            await connected;
+            timeout.Cancel();
+            if (!Native.GetNamedPipeClientProcessId(pipe.SafePipeHandle, out var pid) || pid != process.Id)
+                throw new UnauthorizedAccessException("Worker process identity mismatch.");
             return new(pipe, process);
         }
-        catch { pipe.Dispose(); if (process != null) { try { if (!process.HasExited) process.Kill(true); } catch (InvalidOperationException) { } process.Dispose(); } throw; }
+        catch { pipe.Dispose(); if (process != null) { try { if (!process.HasExited) process.Kill(true); } catch (Exception e) when (e is InvalidOperationException or Win32Exception) { } process.Dispose(); } throw; }
     }
     public async Task ExecuteAsync(WorkerRequest request, Func<WorkerMessage, Task> onMessage, CancellationToken token = default)
     {
@@ -36,15 +57,38 @@ public sealed class WorkerSession : IAsyncDisposable
         while (true)
         {
             var message = await Wire.ReadAsync<WorkerMessage>(pipe, token) ?? throw new IOException("Worker exited before completing the request.");
-            if (message.Kind == "done") break;
-            if (message.Kind == "fatal") throw new IOException(message.Text);
+            if (message.Kind == "done")
+                break;
+            if (message.Kind == "fatal")
+                throw new IOException(message.Text);
             await onMessage(message);
         }
     }
     public async ValueTask DisposeAsync()
     {
         pipe.Dispose();
-        try { if (!process.HasExited) { process.Kill(true); using var timeout = new CancellationTokenSource(5000); await process.WaitForExitAsync(timeout.Token); } }
+        try
+        {
+            if (!process.HasExited)
+            {
+                using var grace = new CancellationTokenSource(250);
+                try
+                {
+                    await process.WaitForExitAsync(grace.Token);
+                }
+                catch (OperationCanceledException) { }
+            }
+        }
+        catch (Exception e) when (e is InvalidOperationException or Win32Exception) { }
+        try
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(true);
+                using var timeout = new CancellationTokenSource(5000);
+                await process.WaitForExitAsync(timeout.Token);
+            }
+        }
         catch (Exception e) when (e is InvalidOperationException or Win32Exception or OperationCanceledException) { }
         process.Dispose();
     }

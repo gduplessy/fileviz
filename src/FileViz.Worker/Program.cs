@@ -8,8 +8,26 @@ try
 {
     Native.EnableBackupPrivilege();
     using var pipe = new NamedPipeClientStream(".", args[1], PipeDirection.InOut, PipeOptions.Asynchronous, TokenImpersonationLevel.Identification);
-    using var timeout = new CancellationTokenSource(60000); await pipe.ConnectAsync(timeout.Token);
-    if (!Native.GetNamedPipeServerProcessId(pipe.SafePipeHandle, out var server) || server != parent) return 3;
+    using var timeout = new CancellationTokenSource(60000);
+    await pipe.ConnectAsync(timeout.Token);
+    if (!Native.GetNamedPipeServerProcessId(pipe.SafePipeHandle, out var server) || server != parent)
+        return 3;
+    // The elevated worker terminates itself on disconnect, even when its scan thread is stuck in provider I/O.
+    // An unelevated UI cannot reliably terminate an elevated process directly.
+    var connectionMonitor = new Thread(() =>
+    {
+        while (true)
+        {
+            Thread.Sleep(100);
+            if (!Native.PeekNamedPipe(pipe.SafePipeHandle, IntPtr.Zero, 0, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero))
+                Environment.Exit(0);
+        }
+    })
+    {
+        IsBackground = true,
+        Name = "FileViz connection monitor"
+    };
+    connectionMonitor.Start();
     while (await Wire.ReadAsync<WorkerRequest>(pipe) is { } request)
     {
         try
@@ -18,16 +36,36 @@ try
             {
                 foreach (var scope in scopes)
                 {
-                    if (!Path.IsPathFullyQualified(scope.Root) || scope.Root.StartsWith(@"\\.\", StringComparison.Ordinal) || scope.Exclusions.Length > 256) throw new InvalidDataException("Invalid scan scope.");
+                    if (!Path.IsPathFullyQualified(scope.Root) || scope.Root.StartsWith(@"\\.\", StringComparison.Ordinal) || scope.Exclusions.Length > 256)
+                        throw new InvalidDataException("Invalid scan scope.");
                     IScanEngine engine = new FileViz.Windows.Ntfs.AutoScanEngine();
-                    await foreach (var batch in engine.ScanAsync(scope)) await Wire.WriteAsync(pipe, new WorkerMessage("batch", Batch: batch));
+                    await foreach (var batch in engine.ScanAsync(scope))
+                        await Wire.WriteAsync(pipe, new WorkerMessage("batch", Batch: batch));
                 }
             }
             else if (request.Operation == "hash" && request.Hashes is { Length: > 0 and <= 128 } hashes)
             {
-                foreach (var hash in hashes) { Hashing.Algorithm(hash.Algorithm); await Wire.WriteAsync(pipe, new WorkerMessage("hash", Hash: await Hashing.HashAsync(hash))); }
+                foreach (var hash in hashes)
+                {
+                    Hashing.Algorithm(hash.Algorithm);
+                    await Wire.WriteAsync(pipe, new WorkerMessage("hash", Hash: await Hashing.HashAsync(hash)));
+                }
             }
-            else throw new InvalidDataException("Unknown worker operation or invalid batch.");
+            else if (request.Operation == "metadata" && request.MetadataPaths is { Length: > 0 and <= 64 } paths)
+            {
+                foreach (var path in paths)
+                {
+                    if (!Path.IsPathFullyQualified(path) || path.StartsWith(@"\\.\", StringComparison.Ordinal))
+                        throw new InvalidDataException("Invalid metadata path.");
+                    try
+                    {
+                        await Wire.WriteAsync(pipe, new WorkerMessage("metadata", Entry: Native.ReadEntry(path)));
+                    }
+                    catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception) { await Wire.WriteAsync(pipe, new WorkerMessage("metadata-error", Text: e.Message, Path: path)); }
+                }
+            }
+            else
+                throw new InvalidDataException("Unknown worker operation or invalid batch.");
             await Wire.WriteAsync(pipe, new WorkerMessage("done"));
         }
         catch (Exception e) when (e is not OutOfMemoryException) { await Wire.WriteAsync(pipe, new WorkerMessage("fatal", Text: e.Message)); }
