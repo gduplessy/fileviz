@@ -74,6 +74,8 @@ public partial class App : Application
                 window.Model.Drives.Add(new FileViz.App.ViewModels.DriveRow(Path.GetFullPath(e.Args[1]), "Fixture · local sample data", "Disposable 40 MiB validation fixture", true));
                 await window.Model.ScanAsync([Path.GetFullPath(e.Args[1])]);
                 await window.Model.FindDuplicatesAsync();
+                if (!string.Equals(window.Model.CurrentRoot, Path.GetFullPath(e.Args[1]), StringComparison.OrdinalIgnoreCase) || window.Model.MapItems.Count == 0)
+                    throw new InvalidOperationException("Snapshot root and populated treemap must remain selected after a scan.");
                 await Task.Delay(500);
                 window.UpdateLayout();
                 var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap((int)((FrameworkElement)window.Content).ActualWidth + 48, (int)((FrameworkElement)window.Content).ActualHeight + 48, 96, 96, PixelFormats.Pbgra32);

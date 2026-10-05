@@ -518,7 +518,7 @@ public sealed class ShellViewModel : Bindable, IDisposable
     }
     private void ReloadHistory()
     {
-        var id = active;
+        var id = selectedSnapshot?.Value.Id;
         var comparisonId = CompareBefore?.Value.Id;
         refreshingHistory = true;
         try { Replace(History, store.Snapshots().Select(x => new SnapshotRow(x))); }
