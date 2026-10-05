@@ -1,0 +1,10 @@
+{
+  "Kind": "Live metadata scan",
+  "Root": "Z:\\",
+  "Engine": "DirectoryScanEngine",
+  "Entries": 10222,
+  "Errors": 1,
+  "PeakWorkingSet": 39415808,
+  "ElapsedSeconds": 0.1127269,
+  "Runtime": "10.0.12"
+}

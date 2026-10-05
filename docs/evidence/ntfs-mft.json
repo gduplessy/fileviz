@@ -1,0 +1,10 @@
+{
+  "Kind": "Live metadata scan",
+  "Root": "Z:\\",
+  "Engine": "MftScanEngine",
+  "Entries": 10251,
+  "Errors": 0,
+  "PeakWorkingSet": 43425792,
+  "ElapsedSeconds": 0.2669566,
+  "Runtime": "10.0.12"
+}
