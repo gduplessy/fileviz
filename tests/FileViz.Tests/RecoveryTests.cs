@@ -39,7 +39,7 @@ public class RecoveryTests
         using var ranking = command.ExecuteReader();
         details.Clear();
         while (ranking.Read()) details.Add(ranking.GetString(3));
-        Assert.Contains(details, x => x.Contains(allocated ? $"folder_{id}_root_allocated" : "folders_rank", StringComparison.Ordinal));
+        Assert.Contains(details, x => x.Contains($"folder_{id}_root_{size}", StringComparison.Ordinal));
         Assert.DoesNotContain(details, x => x.Contains("TEMP B-TREE", StringComparison.Ordinal));
     }
 

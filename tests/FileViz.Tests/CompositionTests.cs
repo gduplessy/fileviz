@@ -8,6 +8,38 @@ namespace FileViz.Tests;
 public class CompositionTests
 {
     [Fact]
+    public void SqlCompositionMatchesCoreClassificationForEveryExtensionAndAge()
+    {
+        using var fixture = new Fixture();
+        using var store = new IndexStore(Path.Combine(fixture.Root, "categories.db"));
+        var id = store.CreateSnapshot([fixture.Root]);
+        var reference = store.StartedTicks(id);
+        var extensions = FileCategories.Extensions.Keys.Concat([".unknown", ""]).ToArray();
+        var entries = extensions.Select((extension, index) =>
+        {
+            var name = "file-" + index + extension.ToUpperInvariant();
+            var modified = (index % 5) switch
+            {
+                0 => 0L,
+                1 => reference + TimeSpan.FromDays(1).Ticks,
+                2 => reference - TimeSpan.FromDays(60).Ticks,
+                3 => reference - TimeSpan.FromDays(200).Ticks,
+                _ => reference - TimeSpan.FromDays(4000).Ticks
+            };
+            return new FileEntry(Path.Combine(fixture.Root, name), fixture.Root, name, "file-" + index, false,
+                13L * (index + 1), 4096, modified, reference, 32);
+        }).ToArray();
+        store.AddBatch(id, new(fixture.Root, "Fixture", entries, []));
+        store.Finish(id, "Complete");
+        var actual = store.FolderComposition(id, fixture.Root)!;
+        foreach (var category in Enum.GetValues<FileCategory>())
+            Assert.Equal(entries.Where(x => FileCategories.Of(x.Extension) == category).Sum(x => x.Length), actual.Categories[(int)category]);
+        for (var bucket = 0; bucket < AgeBuckets.Count; bucket++)
+            Assert.Equal(entries.Where(x => AgeBuckets.Of(x.ModifiedTicks, reference) == bucket).Sum(x => x.Length), actual.Ages[bucket]);
+        Assert.Equal(entries.Sum(x => x.Length), actual.Categories.Sum());
+    }
+
+    [Fact]
     public void BranchingRollupsPreserveDirectFilesSharedAllocationAndEmptyFolders()
     {
         using var fixture = new Fixture();

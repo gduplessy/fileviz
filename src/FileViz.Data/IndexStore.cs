@@ -22,6 +22,9 @@ public sealed partial class IndexStore : IDisposable
         connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = DatabasePath, Mode = SqliteOpenMode.ReadWriteCreate, Pooling = false }.ToString());
         connection.Open();
         Execute("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA cache_size=-32768; PRAGMA temp_store=FILE; PRAGMA busy_timeout=5000; PRAGMA wal_autocheckpoint=10000; PRAGMA foreign_keys=ON;");
+        // Windows SQLite defaults TEMP to just 2 MiB. Large alias/parent aggregates
+        // otherwise thrash that cache even though the main database cache is bounded.
+        ConfigureIndexMemoryBudget();
         Execute("""
         CREATE TABLE IF NOT EXISTS snapshots(id INTEGER PRIMARY KEY,roots TEXT NOT NULL,started TEXT NOT NULL,state TEXT NOT NULL,files INTEGER NOT NULL DEFAULT 0,logical INTEGER NOT NULL DEFAULT 0,allocated INTEGER,errors INTEGER NOT NULL DEFAULT 0);
         CREATE TABLE IF NOT EXISTS entries(snapshot INTEGER NOT NULL REFERENCES snapshots(id) ON DELETE CASCADE,path TEXT NOT NULL,parent TEXT NOT NULL,name TEXT NOT NULL,name_key TEXT NOT NULL,identity TEXT,isdir INTEGER NOT NULL,length INTEGER NOT NULL,allocated INTEGER,modified INTEGER NOT NULL,changed INTEGER NOT NULL,attrs INTEGER NOT NULL,extension TEXT NOT NULL,root TEXT NOT NULL,PRIMARY KEY(snapshot,path));
@@ -31,7 +34,6 @@ public sealed partial class IndexStore : IDisposable
         CREATE TABLE IF NOT EXISTS extension_totals(snapshot INTEGER NOT NULL REFERENCES snapshots(id) ON DELETE CASCADE,root TEXT NOT NULL,extension TEXT NOT NULL,logical INTEGER NOT NULL,files INTEGER NOT NULL,PRIMARY KEY(snapshot,root,extension));
         CREATE INDEX IF NOT EXISTS extension_rank ON extension_totals(snapshot,root,logical DESC);
         CREATE INDEX IF NOT EXISTS errors_snapshot ON errors(snapshot);
-        CREATE INDEX IF NOT EXISTS folders_rank ON folders(snapshot,root,logical DESC);
         CREATE INDEX IF NOT EXISTS folders_depth ON folders(snapshot,depth,parent);
         CREATE TABLE IF NOT EXISTS hashes(path TEXT NOT NULL,algorithm TEXT NOT NULL,sample INTEGER NOT NULL,identity TEXT NOT NULL,length INTEGER NOT NULL,modified INTEGER NOT NULL,changed INTEGER NOT NULL,hash TEXT NOT NULL,PRIMARY KEY(path,algorithm,sample));
         CREATE TABLE IF NOT EXISTS duplicates(snapshot INTEGER NOT NULL REFERENCES snapshots(id) ON DELETE CASCADE,groupid INTEGER NOT NULL,path TEXT NOT NULL,evidence TEXT NOT NULL,keeper INTEGER NOT NULL DEFAULT 0,source INTEGER NOT NULL,PRIMARY KEY(snapshot,path));
@@ -43,6 +45,11 @@ public sealed partial class IndexStore : IDisposable
         EnsureCompositionSchema();
     }
     public void RecoverInterrupted() => Execute("UPDATE snapshots SET state='Interrupted' WHERE state='Scanning';");
+    private void ConfigureIndexMemoryBudget()
+    {
+        var large = new FileInfo(DatabasePath).Length >= 1024L * 1024 * 1024;
+        Execute($"PRAGMA cache_size=-{(large ? 131072 : 32768)}; PRAGMA temp.cache_size=-{(large ? 524288 : 65536)};");
+    }
     public long CreateSnapshot(string[] roots)
     {
         Execute("INSERT INTO snapshots(roots,started,state) VALUES($roots,$started,'Scanning');", ("$roots", JsonSerializer.Serialize(roots)), ("$started", DateTime.UtcNow.ToString("O")));
@@ -78,6 +85,7 @@ public sealed partial class IndexStore : IDisposable
     public void Finish(long snapshot, string state, Action<string>? progress, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
+        ConfigureIndexMemoryBudget();
         using var cancellation = token.Register(() => SQLitePCL.raw.sqlite3_interrupt(connection.Handle!));
         commandCancellation = token;
         try
@@ -113,6 +121,7 @@ public sealed partial class IndexStore : IDisposable
     {
         CreateQueryIndexes(snapshot, progress);
         progress?.Invoke("Calculating folder sizes");
+        Execute($"DROP INDEX IF EXISTS folders_rank; DROP INDEX IF EXISTS folder_{snapshot}_parent_logical; DROP INDEX IF EXISTS folder_{snapshot}_parent_allocated; DROP INDEX IF EXISTS folder_{snapshot}_root_logical; DROP INDEX IF EXISTS folder_{snapshot}_root_allocated;");
         RebuildFolders(snapshot, progress);
         progress?.Invoke("Calculating file types and ages");
         BuildComposition(snapshot);

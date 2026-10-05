@@ -36,24 +36,33 @@ public sealed partial class IndexStore
     public void EnsureFolderNavigationIndexes(long snapshot, Action<string>? progress = null)
     {
         if (snapshot <= 0) throw new ArgumentOutOfRangeException(nameof(snapshot));
+        Execute("DROP INDEX IF EXISTS folders_rank;");
         foreach (var size in new[] { "logical", "allocated" })
         {
             progress?.Invoke($"Preparing folder navigation: {size}");
             Execute($"CREATE INDEX IF NOT EXISTS folder_{snapshot}_parent_{size} ON folders(parent,{size} DESC,path) WHERE snapshot={snapshot};");
+            Execute($"CREATE INDEX IF NOT EXISTS folder_{snapshot}_root_{size} ON folders(root,{size} DESC,path) WHERE snapshot={snapshot};");
         }
-        progress?.Invoke("Preparing folder navigation: allocated ranking");
-        Execute($"CREATE INDEX IF NOT EXISTS folder_{snapshot}_root_allocated ON folders(root,allocated DESC,path) WHERE snapshot={snapshot};");
     }
     /// <summary>Runs after <see cref="RebuildFolders"/>: direct totals per parent, then a depth-ordered rollup like the size totals.</summary>
     private void BuildComposition(long snapshot)
     {
-        var category = "CASE extension " + string.Join(" ", FileCategories.Extensions.Select(x => $"WHEN '{x.Key}' THEN {(int)x.Value}")) + $" ELSE {(int)FileCategory.Other} END";
         var age = $"CASE WHEN modified<=0 THEN {AgeBuckets.Count - 1} " + string.Join(" ", AgeBuckets.Limits.Select((limit, bucket) => $"WHEN $ref-modified<{limit.Ticks} THEN {bucket}")) + $" ELSE {AgeBuckets.Count - 1} END";
-        var sums = string.Join(",", Enumerable.Range(0, FileCategories.Count).Select(i => $"SUM(CASE WHEN cat={i} THEN length ELSE 0 END) c{i}")
+        // A flattened CASE alias was reevaluated for every category sum. Constant IN
+        // sets classify each category directly and avoid repeating the complete map.
+        string CategorySum(int category)
+        {
+            var other = category == (int)FileCategory.Other;
+            var extensions = FileCategories.Extensions.Where(x => other ? x.Value != FileCategory.Other : (int)x.Value == category)
+                .Select(x => $"'{x.Key}'").ToArray();
+            if (extensions.Length == 0) return other ? $"SUM(length) c{category}" : $"0 c{category}";
+            return $"SUM(CASE WHEN extension {(other ? "NOT IN" : "IN")} ({string.Join(",", extensions)}) THEN length ELSE 0 END) c{category}";
+        }
+        var sums = string.Join(",", Enumerable.Range(0, FileCategories.Count).Select(CategorySum)
             .Concat(Enumerable.Range(0, AgeBuckets.Count).Select(i => $"SUM(CASE WHEN age={i} THEN length ELSE 0 END) a{i}")));
         Execute($"""
         DROP TABLE IF EXISTS temp.direct;
-        CREATE TEMP TABLE direct AS SELECT parent,{sums} FROM (SELECT parent,length,{category} cat,{age} age FROM entries WHERE snapshot=$s AND isdir=0) GROUP BY parent;
+        CREATE TEMP TABLE direct AS SELECT parent,{sums} FROM (SELECT parent,length,extension,{age} age FROM entries WHERE snapshot=$s AND isdir=0) GROUP BY parent;
         CREATE INDEX temp.direct_parent ON direct(parent);
         UPDATE folders SET ({CompositionList})=(SELECT {CompositionList} FROM direct WHERE direct.parent=folders.path) WHERE snapshot=$s AND path IN (SELECT parent FROM direct);
         DROP TABLE temp.direct;
