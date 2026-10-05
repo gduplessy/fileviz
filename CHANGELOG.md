@@ -11,6 +11,12 @@
 - Settings are saved: theme, map coloring, scan and duplicate defaults, and saved profiles.
 - Design system and redesign notes in `docs/design.md`.
 
+## 0.1.1 — preview
+
+- Branded README with original light/dark SVG banners, release/build badges, direct download buttons, theme-aware screenshots, GitHub callouts, and collapsible setup details.
+- Versioned Windows packages built from the latest committed source and documentation.
+- Existing scan engines, duplicate analysis, and cleanup behavior are unchanged; preview validation limits still apply.
+
 ## 0.1.0 — preview
 
 - Native WPF Windows 11 x64 desktop application with drive/folder/share selection and paged SQLite snapshots.

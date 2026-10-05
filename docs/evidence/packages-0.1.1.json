@@ -1,0 +1,36 @@
+{
+  "Portable": {
+    "Status": "Duplicate analysis complete. Cleanup performs fresh byte and stream verification.",
+    "SummaryText": "303 files · 39.5 MiB logical · 39.5 MiB reported allocation",
+    "Rows": 250,
+    "DuplicateRows": 2,
+    "PeakWorkingSet": 179175424,
+    "Snapshots": 1,
+    "Errors": 0,
+    "RenderedVisibleWindow": true
+  },
+  "Installed": {
+    "Status": "Duplicate analysis complete. Cleanup performs fresh byte and stream verification.",
+    "SummaryText": "303 files · 39.5 MiB logical · 39.5 MiB reported allocation",
+    "Rows": 250,
+    "DuplicateRows": 2,
+    "PeakWorkingSet": 180375552,
+    "Snapshots": 1,
+    "Errors": 0,
+    "RenderedVisibleWindow": true
+  },
+  "InstallerExitCode": 0,
+  "UninstallerExitCode": 0,
+  "ChecksumsVerified": true,
+  "DeveloperRuntimeRemovedFromEnvironment": true,
+  "OS": "Microsoft Windows NT 10.0.26100.0",
+  "ValidatedUtc": "2026-10-05T01:26:16.6722315Z",
+  "SourceCommit": "6d0c98fb47cdc3d6cb88ff9b04fccc537e88fafd",
+  "ProductVersion": "0.1.1+6d0c98fb47cdc3d6cb88ff9b04fccc537e88fafd",
+  "Release": "https://github.com/gduplessy/fileviz/releases/tag/v0.1.1",
+  "AssetSha256": [
+    "7b69dd2d80b0de88ecd0ab3446ac833ba2889bc1f532ef2a06bcd8390dd617af  FileViz-0.1.1-win-x64-portable.zip",
+    "ebfb2e5f2b25d9b80b7348a4f861d3b01fbf55ef82d28b02d3a467595159deb1  FileViz-0.1.1-win-x64-setup.exe"
+  ],
+  "PackagedReadmeVerified": true
+}
