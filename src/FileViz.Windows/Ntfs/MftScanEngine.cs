@@ -19,6 +19,11 @@ public sealed class MftScanEngine : IScanEngine
         var directories = new Dictionary<ulong, NtfsName>();
         var counter = 0L;
         var total = 2 * reader.RecordCount;
+        // Large MFTs use the ten-million-entry memory allowance. Keep directory
+        // ancestry bounded, but avoid forcing a directory walk after only 250k nodes.
+        var largeVolume = reader.RecordCount > 1_000_000;
+        var maximumDirectories = largeVolume ? 2_000_000 : 250_000;
+        var maximumAncestryBytes = (largeVolume ? 384L : 64L) * 1024 * 1024;
         long ancestryBytes = 0;
         ulong rootReference = 0;
         foreach (var record in reader.Records(cancellationToken, true))
@@ -34,7 +39,7 @@ public sealed class MftScanEngine : IScanEngine
                     directories[record.Reference] = name;
                     ancestryBytes += 160L + 2L * name.Name.Length;
                 }
-                if (directories.Count > 250000 || ancestryBytes > 64L * 1024 * 1024)
+                if (directories.Count > maximumDirectories || ancestryBytes > maximumAncestryBytes)
                     throw new NotSupportedException("Directory ancestry exceeds the raw scanner memory budget; using directory enumeration.");
             }
             if (++counter % 16384 == 0)
