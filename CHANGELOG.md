@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.3 — preview
+
+- Initialize folder views from saved roots and indexed directory rows; avoid reading and sorting every file to rediscover roots.
+- Report folder initialization, allocation-owner discovery, direct totals, and individual rollup depths during recovery and finalization.
+- Mark SQLite view failures as failed and retain the inventory for retry; surface the failure in the desktop UI.
+- Include the 0.2.2 indexed aggregation and cancellation fixes, with 56 passing regressions.
+
 ## 0.2.2 — preview
 
 - Replace repeated folder and composition scans with indexed temporary aggregates. Wide, nested directory trees no longer trigger quadratic finalization work.
