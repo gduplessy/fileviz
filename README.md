@@ -52,34 +52,35 @@ Both packages bundle the Windows x64 runtime; you do not need to install .NET. [
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/desktop-dark.png">
   <source media="(prefers-color-scheme: light)" srcset="docs/images/desktop.png">
-  <img src="docs/images/desktop.png" alt="FileViz with a scanned sample folder, interactive treemap, size filters, and largest-file table" width="1400">
+  <img src="docs/images/desktop.png" alt="FileViz Explorer: Windows 11 window with navigation pane, usage bar by file type, nested space map, inspector, and largest-file list" width="1400">
 </picture>
 
 *Actual desktop, disposable sample data. The screenshot follows your GitHub color theme.*
 
-<details>
-<summary><strong>Compare the light and dark themes</strong></summary>
+> [!NOTE]
+> These screenshots show the Windows 11 redesign on `main`, which ships in the next preview. The v0.1.1 packages above use the earlier single-window layout.
 
-| Light | Dark |
+| Color by age | Duplicate groups |
 | --- | --- |
-| ![Light desktop](docs/images/desktop.png) | ![Dark desktop](docs/images/desktop-dark.png) |
-
-</details>
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/explorer-age-dark.png"><img src="docs/images/explorer-age.png" alt="Space map and usage bar colored by last-modified age, older shown darker"></picture> | <img src="docs/images/duplicates.png" alt="Duplicate pipeline counts and a verified group with Keep and Remove choices"> |
+| **Review before quarantine** | **First run** |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/review-dark.png"><img src="docs/images/review.png" alt="Review window with identity, metadata, byte, and stream checks per file"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/first-run-dark.png"><img src="docs/images/first-run.png" alt="First-run screen with drive selection and a Scan button"></picture> |
 
 ## What you can do
 
 | Explore your storage | Find duplicates | Review cleanup |
 | --- | --- | --- |
-| Drive capacity and used/free space | Case-insensitive name candidates | Exact selected-path review |
-| Largest files and folders | SHA-256 by default; SHA-1 or MD5 options | Fresh identity, byte, and alternate-stream checks |
-| Interactive treemap and file-type breakdown | Size → sample → full-hash pipeline | Same-volume quarantine with an action journal |
-| Logical and reported allocated sizes | Hard links shown as aliases | Restore without overwriting destinations |
-| Filters, exclusions, saved profiles | Preferred-folder keeper suggestions | Explicit Windows Recycle Bin requests |
+| Drive capacity, used/free space, and space not attributed to files | Size → sample → full-hash pipeline with counts at each stage | Precheck of identity, metadata, bytes, and named streams for every file |
+| Nested space map colored by file type or by age | SHA-256 by default; SHA-1 or MD5 options | Only files that pass are quarantined; each move revalidates |
+| Inspector with allocation notes for sparse, compressed, and placeholder files | Explicit Keep and Remove per copy; a keeper is never removed | Same-volume quarantine with an action journal |
+| Largest files, folders, and file types; logical or allocated size | Hard links collapsed as aliases; name matches never count as savings | Restore without overwriting destinations |
+| Filters, exclusions, saved profiles, title-bar search | Preferred-folder keeper suggestions | Explicit Windows Recycle Bin requests |
 
 - **Scan your scope:** one drive, selected folders, multiple roots, or UNC shares. Hidden/system entries are included; reparse children and cloud placeholders are skipped.
 - **Elevate when needed:** request UAC for a read-only scan worker, or restart the whole application as administrator. Complete supported local NTFS volumes can use the raw MFT engine; structural failures discard raw results and visibly fall back to directory enumeration.
-- **Keep useful history:** reopen SQLite snapshots, compare changes, export CSV/JSON, and inspect coverage gaps. Partial, cancelled, and stale results remain labelled.
-- **Stay in control:** pause at safe batch boundaries, cancel workers, use keyboard navigation, or open selected entries in Explorer and inspect properties.
+- **Keep useful history:** reopen SQLite snapshots, compare totals and the folders that changed most, export CSV/JSON, and see coverage gaps by kind. Partial, cancelled, and stale results remain labelled.
+- **Feel at home on Windows 11:** Fluent controls, Mica, your Windows accent color, light/dark/High Contrast themes, Snap Layouts, and full keyboard use (Ctrl+F, Ctrl+1 to 6, F6, Alt+Up).
+- **Stay in control:** pause at safe batch boundaries, cancel workers, or open selected entries in File Explorer and inspect properties.
 
 > [!TIP]
 > Start with a drive or folder scan, inspect the largest files, then run content duplicate analysis only where needed. Hashing reads file contents and adds I/O.
@@ -91,10 +92,10 @@ Both packages bundle the Windows x64 runtime; you do not need to install .NET. [
 
 | Synthetic SQLite dataset | Peak index-process working set | Cached file query median / max |
 | --- | --- | --- |
-| 1 million files, interleaved | 180.60 MiB | 1.12 / 14.70 ms |
+| 1 million files, interleaved (with type and age totals) | 187.16 MiB | 1.36 / 12.31 ms |
 | 10 million files, directory-clustered | 192.59 MiB | 5.76 / 86.67 ms |
 
-These measure the **index component**, not live filesystem throughput or combined UI/worker memory. Dataset orders differ and are not direct scaling comparisons. The raw engine was slower on the small warm NTFS fixture. [Hardware, timings, unmet targets, and reproduction commands](docs/performance.md) · [Machine-readable evidence](docs/evidence/)
+These measure the **index component**, not live filesystem throughput or combined UI/worker memory. Dataset orders differ and are not direct scaling comparisons. The ten-million figures predate the type and age totals. The raw engine was slower on the small warm NTFS fixture. [Hardware, timings, unmet targets, and reproduction commands](docs/performance.md) · [Machine-readable evidence](docs/evidence/)
 
 ## Build from source
 
@@ -122,10 +123,10 @@ See [setup](docs/setup.md), [architecture](docs/architecture.md), and the [relea
 | [User guide](docs/user-guide.md) | [Development setup](docs/setup.md) |
 | [Performance report](docs/performance.md) | [Architecture](docs/architecture.md) |
 | [Validation coverage](docs/validation.md) | [Contributing](CONTRIBUTING.md) |
-| [Changelog](CHANGELOG.md) | [Design system and roadmap](docs/design.md) |
-| | [Report a bug](https://github.com/gduplessy/fileviz/issues/new) |
-| [Release downloads](https://github.com/gduplessy/fileviz/releases) | [Report a security issue privately](SECURITY.md) |
+| [Changelog](CHANGELOG.md) | [Design system](docs/design.md) |
+| [Release downloads](https://github.com/gduplessy/fileviz/releases) | [Report a bug](https://github.com/gduplessy/fileviz/issues/new) |
+| | [Report a security issue privately](SECURITY.md) |
 
-**Local by default:** snapshots and journals live in `%LOCALAPPDATA%/FileViz`. No telemetry, automatic deletion, hard-link replacement, automatic updates, drivers, or remote storage. Scanning and hashing do not modify files.
+**Local by default:** snapshots, settings, and journals live in `%LOCALAPPDATA%/FileViz`. No telemetry, automatic deletion, hard-link replacement, automatic updates, drivers, or remote storage. Scanning and hashing do not modify files.
 
 **GPL-3.0-only:** see [LICENSE](LICENSE). Full dependency licenses and [third-party notices](THIRD-PARTY-NOTICES.md) ship with both packages. The README banners are original SVG artwork included in this repository.
