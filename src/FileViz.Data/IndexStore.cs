@@ -6,6 +6,7 @@ namespace FileViz.Data;
 public sealed partial class IndexStore : IDisposable
 {
     private readonly SqliteConnection connection;
+    private CancellationToken commandCancellation;
     public string DatabasePath
     {
         get;
@@ -71,7 +72,38 @@ public sealed partial class IndexStore : IDisposable
             Execute("INSERT INTO errors(snapshot,path,message,kind) VALUES($s,$p,$m,$k);", ("$s", snapshot), ("$p", error.Path), ("$m", error.Message), ("$k", error.Kind));
         transaction.Commit();
     }
-    public void Finish(long snapshot, string state, Action<string>? progress = null)
+    public void Finish(long snapshot, string state, Action<string>? progress = null) => Finish(snapshot, state, progress, CancellationToken.None);
+
+    /// <summary>Builds views from persisted metadata; cancellation interrupts an executing SQLite statement.</summary>
+    public void Finish(long snapshot, string state, Action<string>? progress, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        using var cancellation = token.Register(() => SQLitePCL.raw.sqlite3_interrupt(connection.Handle!));
+        commandCancellation = token;
+        try
+        {
+            Execute("UPDATE snapshots SET state='Scanning',composition=0 WHERE id=$s; DELETE FROM root_totals WHERE snapshot=$s; DELETE FROM extension_totals WHERE snapshot=$s;", ("$s", snapshot));
+            FinishViews(snapshot, state, progress);
+            token.ThrowIfCancellationRequested();
+        }
+        catch (SqliteException e) when (e.SqliteErrorCode == 9 && token.IsCancellationRequested)
+        {
+            throw new OperationCanceledException("Snapshot finalization cancelled.", e, token);
+        }
+        finally { commandCancellation = default; }
+    }
+
+    /// <summary>Rebuilds saved views without scanning roots or claiming that interrupted coverage is complete.</summary>
+    public void RebuildViews(long snapshot, Action<string>? progress = null, CancellationToken token = default)
+    {
+        var state = Scalar("SELECT state FROM snapshots WHERE id=$s;", ("$s", snapshot)) as string;
+        if (state is null || !(state.StartsWith("Interrupted", StringComparison.Ordinal) || state.StartsWith("Cancelled", StringComparison.Ordinal) || state.StartsWith("Failed", StringComparison.Ordinal)))
+            throw new InvalidOperationException("Only interrupted, cancelled, or failed snapshots can be rebuilt.");
+        try { Finish(snapshot, state, progress, token); }
+        catch (OperationCanceledException) { SetState(snapshot, "Cancelled"); throw; }
+    }
+
+    private void FinishViews(long snapshot, string state, Action<string>? progress)
     {
         CreateQueryIndexes(snapshot, progress);
         progress?.Invoke("Calculating folder sizes");
@@ -453,6 +485,7 @@ public sealed partial class IndexStore : IDisposable
     private static string EscapeLike(string value) => value.Replace("!", "!!").Replace("%", "!%").Replace("_", "!_");
     private SqliteCommand Command(string sql, params (string Name, object? Value)[] parameters)
     {
+        commandCancellation.ThrowIfCancellationRequested();
         // A literal snapshot constraint lets SQLite prove the per-snapshot partial-index predicate.
         var snapshot = parameters.FirstOrDefault(x => x.Name == "$s");
         if (snapshot.Value is long or int)
@@ -466,11 +499,13 @@ public sealed partial class IndexStore : IDisposable
     }
     private void Execute(string sql, params (string Name, object? Value)[] parameters)
     {
+        commandCancellation.ThrowIfCancellationRequested();
         using var command = Command(sql, parameters);
         command.ExecuteNonQuery();
     }
     private object? Scalar(string sql, params (string Name, object? Value)[] parameters)
     {
+        commandCancellation.ThrowIfCancellationRequested();
         using var command = Command(sql, parameters);
         var result = command.ExecuteScalar();
         return result == DBNull.Value ? null : result;

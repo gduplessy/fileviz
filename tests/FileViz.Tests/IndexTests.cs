@@ -218,4 +218,49 @@ public class IndexTests
         Assert.Equal("Complete", Assert.Single(store.Snapshots()).State);
         Assert.Equal(3, store.GetSummary(id).Logical);
     }
+
+    [Fact]
+    public async Task CancellationInterruptsExecutingSqlAndSavedInventoryCanBeRebuilt()
+    {
+        using var fixture = new Fixture();
+        var db = Path.Combine(fixture.Root, "interrupt.db");
+        using var store = new IndexStore(db);
+        var id = store.CreateSnapshot([fixture.Root]);
+        var entry = new FileEntry(Path.Combine(fixture.Root, "a"), fixture.Root, "a", "id", false, 3, 8, 100, 100, 32);
+        store.AddBatch(id, new(fixture.Root, "Fixture", [entry], []));
+        using var audit = new SqliteConnection($"Data Source={db};Pooling=False");
+        audit.Open();
+        using var command = audit.CreateCommand();
+        command.CommandText = """
+        CREATE TRIGGER slow_fixture_update BEFORE UPDATE ON folders BEGIN
+        SELECT (WITH RECURSIVE spin(v) AS (VALUES(0) UNION ALL SELECT v+1 FROM spin WHERE v<1000000000) SELECT SUM(v) FROM spin);
+        END;
+        """;
+        command.ExecuteNonQuery();
+        using var cancellation = new CancellationTokenSource();
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var work = Task.Run(() => store.Finish(id, "Complete", stage =>
+        {
+            if (stage == "Calculating folder sizes")
+            {
+                cancellation.CancelAfter(100);
+                started.TrySetResult();
+            }
+        }, cancellation.Token));
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => work.WaitAsync(TimeSpan.FromSeconds(2)));
+        command.CommandText = "DROP TRIGGER slow_fixture_update;";
+        command.ExecuteNonQuery();
+        store.SetState(id, "Interrupted");
+        Assert.Equal(entry, store.Entry(id, entry.Path));
+        store.RebuildViews(id);
+        Assert.Equal("Interrupted", Assert.Single(store.Snapshots()).State);
+        Assert.Equal(3, store.GetSummary(id).Logical);
+        Assert.True(store.HasComposition(id));
+        Assert.Equal(entry, store.Entry(id, entry.Path));
+        store.SetState(id, "Complete");
+        Assert.Throws<InvalidOperationException>(() => store.RebuildViews(id));
+        store.SetState(id, "Scanning");
+        Assert.Throws<InvalidOperationException>(() => store.RebuildViews(id));
+    }
 }
