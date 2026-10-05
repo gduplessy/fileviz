@@ -3,8 +3,13 @@
 ## Unreleased
 
 - Windows 11 Fluent theme with Mica, the Windows accent color, and system, light, or dark mode chosen in Settings.
-- New window layout: title bar search (Ctrl+F), left navigation (Home, Explorer, Duplicates, Compare, Cleanup, Diagnostics, Settings; Ctrl+1 to Ctrl+6), and a status bar. Folders and File types are now a switch inside Explorer.
-- Design system and redesign roadmap in `docs/design.md`.
+- New window layout: title bar search (Ctrl+F), left navigation (Home, Explorer, Duplicates, Compare, Cleanup, Diagnostics, Settings; Ctrl+1 to Ctrl+6, F6 to move between panes), and a status bar. Folders and File types are now a switch inside Explorer.
+- Home: first-run layout, drive cards with capacity and latest snapshot state, and live scan progress including MFT records read.
+- Explorer: two-level space map colored by file type or by age, a usage bar with "not attributed" space, breadcrumb navigation, and an inspector with allocation notes and shell actions. Requires a rescan for snapshots taken by earlier versions.
+- Duplicates: pipeline counts, group cards with explicit Keep and Remove choices, and a review window that prechecks identity, metadata, bytes, and named streams for every file before quarantine.
+- Compare totals every change and shows the folders that changed most; Cleanup shows held space and per-file details; Diagnostics groups entries into coverage gaps, warnings, and items not traversed.
+- Settings are saved: theme, map coloring, scan and duplicate defaults, and saved profiles.
+- Design system and redesign notes in `docs/design.md`.
 
 ## 0.1.0 — preview
 

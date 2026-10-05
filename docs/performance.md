@@ -13,6 +13,8 @@ The synthetic generator creates 1,000 directories and files with deterministic s
 
 The million-entry index used 834,646,016 database bytes; the ten-million-entry index used 8,377,925,632 bytes. The ten-million run completed in 23.37 minutes, with most time spent building indexes and summaries. Interleaved insertion is materially slower than directory-clustered insertion because it scatters primary-index writes. The directory engine performs depth-first traversal. Dataset ordering is stated explicitly; timings across different orders are not direct scaling comparisons.
 
+**With composition totals (redesign, same machine, 2026-10-04).** Finishing a snapshot now also builds per-folder file-type and age totals. The one-million interleaved run finalized in 130.79 s, against 124.20 s before (+6.6 s, +5.3%). Peak working set was 187.16 MiB, the cached file query median/max 1.36 / 12.31 ms, and the database 835,932,160 bytes (+1.3 MB). Ingest took 187.12 s against 505.11 s earlier; ingestion code did not change, so that gap reflects run conditions and is not claimed as an improvement. The ten-million run was not repeated. [Evidence](evidence/index-million-composition.json).
+
 Both index processes met their component memory budgets (512 MiB / 1 GiB) and the 500 ms primary-query budget. This is not a combined UI/worker measurement. A separate visible desktop smoke run indexed 303 files / 40 MiB and found the expected SHA-256 duplicate pair, with zero diagnostics; its UI process peaked at 169.18 MiB. Combined working sets on real million/ten-million-file volumes remain unverified.
 
 ## Disposable NTFS fixture
