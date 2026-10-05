@@ -1,0 +1,28 @@
+{
+  "Version": "0.2.3",
+  "SourceVersion": "0.2.3+a234551752520e3706fae5cbe08a55a72d90b7cf",
+  "ChecksumsVerified": true,
+  "DeveloperRuntimeRemovedFromEnvironment": true,
+  "InstallerTested": true,
+  "Portable": {
+    "Status": "Duplicate analysis complete. Cleanup performs fresh byte and stream verification.",
+    "SummaryText": "304 files · 39.63 MiB logical · 39.38 MiB reported allocation",
+    "Rows": 250,
+    "DuplicateRows": 2,
+    "PeakWorkingSet": 184107008,
+    "Snapshots": 1,
+    "Errors": 0,
+    "RebuiltSavedInventory": true,
+    "RenderedVisibleWindow": true
+  },
+  "SmokeExitCode": 0,
+  "ValidatedUtc": "2026-10-05T19:33:37.5329149Z",
+  "SourceCommit": "a234551752520e3706fae5cbe08a55a72d90b7cf",
+  "ReleaseWorkflow": "https://github.com/gduplessy/fileviz/actions/runs/37363125193",
+  "RegressionTestsPassed": 59,
+  "InstalledUpgradeTested": true,
+  "InstalledVersion": "0.2.3+a234551752520e3706fae5cbe08a55a72d90b7cf",
+  "InstallerExitCode": 0,
+  "InstallerNote": "Downloaded installer checksum verified; per-user upgrade exited successfully and installed version matched the tag. No uninstall test in this run.",
+  "UninstallerTested": false
+}
