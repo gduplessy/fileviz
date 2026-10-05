@@ -44,6 +44,10 @@ public interface IScanEngine
 }
 public static class Format
 {
+    /// <summary>Elapsed time without wrapping at an hour or a day.</summary>
+    public static string Elapsed(TimeSpan value) => value.TotalHours >= 1
+        ? $"{(long)value.TotalHours}:{value.Minutes:00}:{value.Seconds:00}"
+        : $"{(long)value.TotalMinutes}:{value.Seconds:00}";
     /// <summary>"1 file", "2 files".</summary>
     public static string Count(long count, string singular, string? plural = null) => $"{count:N0} {(count == 1 ? singular : plural ?? singular + "s")}";
     public static string Bytes(long value)

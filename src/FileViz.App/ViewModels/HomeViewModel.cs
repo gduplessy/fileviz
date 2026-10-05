@@ -15,7 +15,7 @@ public sealed class HomeViewModel : Bindable, ISnapshotSection
 {
     private readonly SessionViewModel session;
     private readonly System.Windows.Threading.DispatcherTimer clock = new() { Interval = TimeSpan.FromSeconds(1) };
-    private DateTime scanStarted;
+    private readonly Stopwatch scanTimer = new();
     public SessionViewModel Session => session;
     public ObservableCollection<DriveRow> Drives { get; } = [];
     public ObservableCollection<ScanProfile> Profiles { get; } = [];
@@ -114,7 +114,7 @@ public sealed class HomeViewModel : Bindable, ISnapshotSection
     public HomeViewModel(SessionViewModel session)
     {
         this.session = session;
-        clock.Tick += (_, _) => ScanElapsed = (DateTime.UtcNow - scanStarted).ToString(@"m\:ss");
+        clock.Tick += (_, _) => ScanElapsed = Format.Elapsed(scanTimer.Elapsed);
         session.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(SessionViewModel.Scanning))
@@ -233,7 +233,7 @@ public sealed class HomeViewModel : Bindable, ISnapshotSection
         var database = session.DatabasePath;
         var snapshot = session.Store.CreateSnapshot(roots);
         session.BeginSnapshot(snapshot);
-        long count = 0;
+        var tally = new ScanTally();
         var exclusions = Excluded();
         var preferMft = PreferMft;
         var administrator = session.Administrator;
@@ -246,8 +246,7 @@ public sealed class HomeViewModel : Bindable, ISnapshotSection
         ProgressKnown = false;
         ProgressValue = 0;
         ProgressText = "";
-        long bytes = 0;
-        scanStarted = DateTime.UtcNow;
+        scanTimer.Restart();
         clock.Start();
         var progress = new Progress<ScanUpdate>(update =>
         {
@@ -275,11 +274,8 @@ public sealed class HomeViewModel : Bindable, ISnapshotSection
                         return;
                     await session.WaitIfPausedAsync(token);
                     writer.AddBatch(snapshot, batch);
-                    count += batch.Entries.LongLength;
-                    foreach (var entry in batch.Entries)
-                        if (!entry.IsDirectory)
-                            bytes += entry.Length;
-                    ((IProgress<ScanUpdate>)progress).Report(new($"{batch.Engine} · {count:N0} entries · {batch.Root}", batch.Engine, count, bytes, batch.Progress));
+                    tally.Add(batch);
+                    ((IProgress<ScanUpdate>)progress).Report(new($"{batch.Engine} · {tally.Entries:N0} entries · {batch.Root}", batch.Engine, tally.Files, tally.Bytes, batch.Progress));
                 }, token);
                 var aliases = new List<string>(64);
                 var aliasBytes = 0;
@@ -320,7 +316,7 @@ public sealed class HomeViewModel : Bindable, ISnapshotSection
             {
                 await Task.Run(() => { using var writer = new IndexStore(database); writer.Finish(snapshot, state); });
             }
-            finally { clock.Stop(); session.EndWork(); }
+            finally { scanTimer.Stop(); ScanElapsed = Format.Elapsed(scanTimer.Elapsed); clock.Stop(); session.EndWork(); }
             session.OpenSnapshot(snapshot);
             await session.RefreshAsync();
             if (state == "Complete")
