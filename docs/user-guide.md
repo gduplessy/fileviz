@@ -2,7 +2,7 @@
 
 ## Scan
 
-Select one or more drives, add a folder/share, or enter additional roots. Overlapping roots are collapsed. Hidden/system entries are included. Exclusions accept an absolute folder prefix or filename wildcard; profiles save roots, exclusions, and the preferred engine.
+On **Home**, select one or more drives, add a folder/share, or enter additional roots. Overlapping roots are collapsed. Hidden/system entries are included. Exclusions accept an absolute folder prefix or filename wildcard; profiles save roots, exclusions, and the preferred engine.
 
 FileViz runs unelevated by default. Check **Administrator scan** to launch a read-only worker through UAC. Raw MFT scanning is used for complete local NTFS volumes; selected subfolders, unsupported formats, and shares use directory enumeration. A raw failure discards its entries and restarts through the directory engine, with an explanation under **Diagnostics**. Worker elevation must use the same Windows identity. If UAC requires another administrator account, run the entire application as that account instead. Mapped shares are resolved to UNC paths before elevation. Existing Windows credentials are used; authentication errors do not change network configuration.
 
@@ -10,11 +10,11 @@ Pause stops consumption at a metadata batch boundary. Cancel closes the pipe and
 
 ## Explore
 
-Choose a snapshot and its drive/root in the sidebar. The treemap shows the largest children; click a folder to navigate. **Largest files** returns to the current root ranking. File/folder views use bounded pages or top-100 rankings, rather than loading the entire inventory. Logical and reported allocated sizes differ for sparse, compressed, resident, and hard-linked files. Unknown allocation is labelled; allocation is counted once per known identity in totals.
+Open **Explorer** and choose a snapshot and its drive/root at the top. The space map shows the largest children; click a folder to navigate. The Files, Folders, and Types switch changes the list below the map. **Largest files** returns to the current root ranking. File/folder views use bounded pages or top-100 rankings, rather than loading the entire inventory. Logical and reported allocated sizes differ for sparse, compressed, resident, and hard-linked files. Unknown allocation is labelled; allocation is counted once per known identity in totals.
 
 Apply literal name/path, extension, minimum MiB, modified-date, and hidden-attribute filters. Explorer, Copy path, and Properties operate on selected entries. Export writes the complete snapshot as CSV or JSON to a new file. Snapshot comparisons require matching roots and show the first 250 added, removed, or grown files; partial coverage affects comparisons.
 
-Keyboard: F5 scan, Escape cancel, Alt+Up navigate, Ctrl+E export. Theme toggles light/dark. Controls support keyboard focus, accessible names, and per-monitor DPI scaling.
+Keyboard: F5 scan, Escape cancel, Alt+Up navigate, Ctrl+E export, Ctrl+F search the selected snapshot, Ctrl+1 to Ctrl+6 switch sections. The theme follows Windows by default; choose light or dark in Settings. The accent color follows your Windows accent color. Controls support keyboard focus, accessible names, and per-monitor DPI scaling.
 
 ## Duplicates and cleanup
 

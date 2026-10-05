@@ -6,7 +6,7 @@
 - `FileViz.Windows`: native directory enumeration, read-only NTFS scanner/parser, hashing, authenticated worker sessions, and reviewed cleanup interop.
 - `FileViz.Data`: SQLite snapshots, path entries/file identities, partial indexes, materialized totals, staged duplicate work, profiles, reports, and action journals.
 - `FileViz.Worker`: isolated scan/metadata/hash process. Normal or same-user UAC elevation; no database writes, cleanup requests, drivers, volume locks, or arbitrary command execution.
-- `FileViz.App`: WPF view models, commands, paged collections, treemap, and review dialogs.
+- `FileViz.App`: WPF shell on the Fluent theme. `SessionViewModel` holds the index, snapshot selection, and long-running work; each section (Home, Explorer, Duplicates, Compare, Cleanup, Diagnostics, Settings) has its own view model and `UserControl`; plus the treemap and review dialog. Visual system and roadmap: [design.md](design.md).
 - `FileViz.Tests` / `FileViz.Benchmarks`: disposable correctness fixtures and reproducible component/engine measurements.
 
 The UI owns SQLite writes through background service connections. A current-user-only random named pipe accepts the launched worker PID; the worker validates its parent/server PID. A dedicated worker thread monitors pipe disconnection and exits even if provider I/O blocks the scan thread. The UI also kills unresponsive workers when its token permits it. Same-user application instances serialize through a named mutex; an elevated relaunch waits for the prior process to close.

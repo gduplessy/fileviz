@@ -122,7 +122,8 @@ See [setup](docs/setup.md), [architecture](docs/architecture.md), and the [relea
 | [User guide](docs/user-guide.md) | [Development setup](docs/setup.md) |
 | [Performance report](docs/performance.md) | [Architecture](docs/architecture.md) |
 | [Validation coverage](docs/validation.md) | [Contributing](CONTRIBUTING.md) |
-| [Changelog](CHANGELOG.md) | [Report a bug](https://github.com/gduplessy/fileviz/issues/new) |
+| [Changelog](CHANGELOG.md) | [Design system and roadmap](docs/design.md) |
+| | [Report a bug](https://github.com/gduplessy/fileviz/issues/new) |
 | [Release downloads](https://github.com/gduplessy/fileviz/releases) | [Report a security issue privately](SECURITY.md) |
 
 **Local by default:** snapshots and journals live in `%LOCALAPPDATA%/FileViz`. No telemetry, automatic deletion, hard-link replacement, automatic updates, drivers, or remote storage. Scanning and hashing do not modify files.
