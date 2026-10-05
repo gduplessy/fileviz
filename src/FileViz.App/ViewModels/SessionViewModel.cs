@@ -158,6 +158,11 @@ public sealed class SessionViewModel : Bindable, IDisposable
         Active = id;
         Changed(nameof(HasSnapshot));
     }
+    internal void ClearPendingSnapshot()
+    {
+        Active = selectedSnapshot?.Value.Id ?? 0;
+        Changed(nameof(HasSnapshot));
+    }
     public void OpenSnapshot(long id)
     {
         ReloadHistory();

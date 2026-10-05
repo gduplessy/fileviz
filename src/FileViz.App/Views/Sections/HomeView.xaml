@@ -89,7 +89,7 @@
       <TextBlock Margin="0,0,28,0" Typography.NumeralAlignment="Tabular"><Run Text="Logical " Foreground="{DynamicResource TextFillColorSecondaryBrush}"/><Run Text="{Binding ScanBytes, Mode=OneWay}" FontWeight="SemiBold"/></TextBlock>
       <TextBlock Margin="0,0,28,0" Typography.NumeralAlignment="Tabular"><Run Text="Elapsed " Foreground="{DynamicResource TextFillColorSecondaryBrush}"/><Run Text="{Binding ScanElapsed, Mode=OneWay}" FontWeight="SemiBold"/></TextBlock>
      </WrapPanel>
-     <TextBlock Text="Partial until completion. Pause waits for the current batch or finalization step. Saving partial results can continue after cancellation." Style="{StaticResource CaptionText}" Margin="0,8,0,0" TextWrapping="Wrap"/>
+     <TextBlock Text="Partial until completion. Pause waits for the current batch or finalization step. Cancel keeps the saved inventory; rebuild its views from Recent snapshots." Style="{StaticResource CaptionText}" Margin="0,8,0,0" TextWrapping="Wrap"/>
     </StackPanel>
    </Border>
 
@@ -112,7 +112,10 @@
      </Button>
      <Border Grid.Row="3" Style="{StaticResource Card}" Padding="0">
       <DockPanel>
-       <Border DockPanel.Dock="Top" Style="{StaticResource CardHeader}"><TextBlock Text="Recent snapshots" Style="{StaticResource BodyStrongText}"/></Border>
+       <Border DockPanel.Dock="Top" Style="{StaticResource CardHeader}"><DockPanel>
+        <Button DockPanel.Dock="Right" Content="Rebuild saved views" Command="{Binding RebuildCommand}" CommandParameter="{Binding SelectedItem, ElementName=SnapshotsGrid}" ToolTip="Rebuild an interrupted, cancelled, or failed snapshot from saved inventory, without rescanning folders."/>
+        <TextBlock Text="Recent snapshots" Style="{StaticResource BodyStrongText}" VerticalAlignment="Center"/>
+       </DockPanel></Border>
        <DataGrid x:Name="SnapshotsGrid" Style="{StaticResource ListGrid}" ItemsSource="{Binding Session.History}" SelectionMode="Single" MouseDoubleClick="Snapshots_DoubleClick" KeyDown="Snapshots_KeyDown" AutomationProperties.Name="Recent snapshots. Press Enter to open.">
         <DataGrid.Columns>
          <DataGridTextColumn Header="#" Binding="{Binding Value.Id}" Width="50"/>

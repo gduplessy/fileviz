@@ -43,8 +43,19 @@ public partial class App : Application
                 return;
             }
         }
-        var window = new MainWindow(smoke ? Path.Combine(Path.GetFullPath(e.Args[2]), "smoke.db") : null);
+        var databaseArgument = Array.IndexOf(e.Args, "--database");
+        var database = databaseArgument >= 0 && databaseArgument + 1 < e.Args.Length ? Path.GetFullPath(e.Args[databaseArgument + 1]) : null;
+        if (database?.StartsWith("\\\\", StringComparison.Ordinal) == true)
+        {
+            MessageBox.Show("The snapshot database must be stored on a local drive.", "FileViz");
+            Shutdown(2);
+            return;
+        }
+        var window = new MainWindow(smoke ? Path.Combine(Path.GetFullPath(e.Args[2]), "smoke.db") : database);
         window.Show();
+        var rebuildArgument = Array.IndexOf(e.Args, "--rebuild-snapshot");
+        if (rebuildArgument >= 0 && rebuildArgument + 1 < e.Args.Length && long.TryParse(e.Args[rebuildArgument + 1], out var rebuild) && rebuild > 0)
+            window.ContentRendered += async (_, _) => { await window.Ready.Task; await window.Model.Home.RebuildViewsAsync(rebuild); };
         if (e.Args.Length >= 2 && e.Args[0] == "--roots")
             window.ContentRendered += async (_, _) => { await window.Ready.Task; foreach (var drive in window.Model.Home.Drives) drive.Selected = false; window.Model.Home.ExtraRoots = string.Join(Environment.NewLine, System.Text.Json.JsonSerializer.Deserialize<string[]>(e.Args[1]) ?? []); window.Model.Home.ChangedRoots(); };
         if (smoke)
@@ -88,6 +99,17 @@ public partial class App : Application
                     || !scanStages.Any(x => x.StartsWith("Preparing file views", StringComparison.Ordinal))
                     || !scanStages.Contains("Saving snapshot") || window.Model.Home.ScanEngine != "Finalizing")
                     throw new InvalidOperationException("Scan progress must expose hard-link refresh and snapshot finalization.");
+                var rebuilt = Environment.GetEnvironmentVariable("FILEVIZ_SMOKE_RECOVERY") == "1";
+                if (rebuilt)
+                {
+                    var saved = window.Model.Session.Active;
+                    var before = window.Model.Session.Store.GetSummary(saved);
+                    File.WriteAllText(Path.Combine(Path.GetFullPath(e.Args[1]), "not-in-saved-inventory.tmp"), "A rescan would include this file.");
+                    window.Model.Session.Store.SetState(saved, "Interrupted");
+                    await window.Model.Home.RebuildViewsAsync(saved);
+                    if (window.Model.Session.Store.GetSummary(saved) != before || window.Model.Session.History.First(x => x.Value.Id == saved).Value.State != "Interrupted")
+                        throw new InvalidOperationException("Rebuilding must preserve saved inventory and interrupted coverage without rescanning.");
+                }
                 await window.Model.Duplicates.FindDuplicatesAsync();
                 if (!string.Equals(window.Model.Session.CurrentRoot, Path.GetFullPath(e.Args[1]), StringComparison.OrdinalIgnoreCase) || window.Model.Explorer.MapItems.Count == 0)
                     throw new InvalidOperationException("Snapshot root and populated treemap must remain selected after a scan.");
@@ -140,6 +162,7 @@ public partial class App : Application
                     PeakWorkingSet = System.Diagnostics.Process.GetCurrentProcess().PeakWorkingSet64,
                     Snapshots = window.Model.Session.History.Count,
                     Errors = window.Model.Diagnostics.Errors.Count,
+                    RebuiltSavedInventory = rebuilt,
                     RenderedVisibleWindow = true
                 }));
                 Shutdown(window.Model.Explorer.Files.Count > 0 && window.Model.Diagnostics.Errors.Count == 0 && window.Model.Duplicates.Duplicates.Count >= 2 ? 0 : 1);

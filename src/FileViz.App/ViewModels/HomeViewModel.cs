@@ -56,9 +56,9 @@ public sealed class HomeViewModel : Bindable, ISnapshotSection
     }
     private string scanEngine = ""; public string ScanEngine
     {
-        get => scanEngine; private set => Set(ref scanEngine, value);
+        get => scanEngine; private set { if (Set(ref scanEngine, value)) Changed(nameof(ScanWorker)); }
     }
-    public string ScanWorker => session.Administrator ? "Read-only elevated worker" : "Read-only worker";
+    public string ScanWorker => ScanEngine is "Finalizing" or "Rebuilding" ? "Saved inventory" : session.Administrator ? "Read-only elevated worker" : "Read-only worker";
     private long scanFiles; public long ScanFiles
     {
         get => scanFiles; private set => Set(ref scanFiles, value);
@@ -99,6 +99,7 @@ public sealed class HomeViewModel : Bindable, ISnapshotSection
     {
         get;
     }
+    public ICommand RebuildCommand { get; }
     public ICommand AddRootCommand
     {
         get;
@@ -133,6 +134,13 @@ public sealed class HomeViewModel : Bindable, ISnapshotSection
         };
         ScanCommand = new ActionCommand(() => session.Run(() => ScanAsync()), () => !session.Busy);
         RescanCommand = new ActionCommand(() => session.Run(() => ScanAsync(session.SnapshotRoots.ToArray())), () => !session.Busy && session.SnapshotRoots.Count > 0);
+        RebuildCommand = new ParameterCommand(value =>
+        {
+            if (value is SnapshotRow row)
+                session.Run(() => RebuildViewsAsync(row.Value.Id));
+            else
+                session.Status = "Select an interrupted, cancelled, or failed snapshot to rebuild.";
+        }, () => !session.Busy);
         AddRootCommand = new ActionCommand(AddRoot, () => !session.Busy);
         SaveProfileCommand = new ActionCommand(() =>
         {
@@ -332,18 +340,22 @@ public sealed class HomeViewModel : Bindable, ISnapshotSection
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or Win32Exception) { state = "Failed"; session.Store.AddError(snapshot, string.Join(';', roots), e.Message); session.Status = "Scan failed: " + e.Message; }
         finally
         {
+            var viewsReady = false;
             try
             {
                 await Task.Run(() =>
                 {
                     using var writer = new IndexStore(database);
-                    writer.Finish(snapshot, state, detail =>
+                    try
                     {
-                        ReportPhase("Finalizing", detail);
-                        // Long SQLite statements finish before pause can take effect.
-                        session.WaitIfPausedAsync(CancellationToken.None).GetAwaiter().GetResult();
-                    });
-                    if (state == "Complete" && token.IsCancellationRequested)
+                        writer.Finish(snapshot, state, detail =>
+                        {
+                            ReportPhase("Finalizing", detail);
+                            session.WaitIfPausedAsync(token).GetAwaiter().GetResult();
+                        }, token);
+                        viewsReady = true;
+                    }
+                    catch (OperationCanceledException)
                     {
                         state = "Cancelled";
                         writer.SetState(snapshot, state);
@@ -351,14 +363,75 @@ public sealed class HomeViewModel : Bindable, ISnapshotSection
                 });
             }
             finally { scanTimer.Stop(); ScanElapsed = Format.Elapsed(scanTimer.Elapsed); clock.Stop(); session.EndWork(); }
-            session.OpenSnapshot(snapshot);
-            await session.RefreshAsync();
+            if (viewsReady)
+            {
+                session.OpenSnapshot(snapshot);
+                await session.RefreshAsync();
+            }
+            else
+            {
+                session.ClearPendingSnapshot();
+                session.ReloadHistory();
+            }
             if (state == "Complete")
                 session.Status = "Scan complete. Review diagnostics for any coverage gaps.";
             else if (state == "Cancelled")
-                session.Status = "Scan cancelled. Partial snapshot saved.";
+                session.Status = viewsReady ? "Scan cancelled. Partial snapshot saved." : "Scan cancelled. Saved inventory retained; select the snapshot and rebuild its views.";
             else
                 session.Status = "Scan failed. Partial snapshot saved; review diagnostics.";
+        }
+    }
+
+    public async Task RebuildViewsAsync(long snapshot)
+    {
+        if (session.Busy)
+            return;
+        var row = session.Store.Snapshots().FirstOrDefault(x => x.Id == snapshot);
+        if (row is null || !(row.State.StartsWith("Interrupted", StringComparison.Ordinal) || row.State.StartsWith("Cancelled", StringComparison.Ordinal) || row.State.StartsWith("Failed", StringComparison.Ordinal)))
+        {
+            session.Status = "Select an interrupted, cancelled, or failed snapshot to rebuild.";
+            return;
+        }
+        var token = session.BeginWork(scan: true);
+        ScanTarget = $"saved snapshot #{snapshot}";
+        ScanEngine = "Rebuilding";
+        ScanFiles = row.Files;
+        ScanBytes = Format.Bytes(row.Logical);
+        ProgressKnown = false;
+        ProgressValue = 0;
+        ProgressText = "Rebuilding views from saved inventory";
+        ScanElapsed = "0:00";
+        scanTimer.Restart();
+        clock.Start();
+        var progress = new Progress<string>(detail => { session.Status = detail; ProgressText = detail; });
+        var ready = false;
+        try
+        {
+            await Task.Run(() =>
+            {
+                using var writer = new IndexStore(session.DatabasePath);
+                writer.RebuildViews(snapshot, detail =>
+                {
+                    ((IProgress<string>)progress).Report(detail);
+                    session.WaitIfPausedAsync(token).GetAwaiter().GetResult();
+                }, token);
+            });
+            ready = true;
+        }
+        catch (OperationCanceledException) { session.Status = "Rebuild cancelled. Saved inventory retained."; }
+        finally
+        {
+            scanTimer.Stop();
+            ScanElapsed = Format.Elapsed(scanTimer.Elapsed);
+            clock.Stop();
+            session.EndWork();
+            session.ReloadHistory();
+        }
+        if (ready)
+        {
+            session.OpenSnapshot(snapshot);
+            await session.RefreshAsync();
+            session.Status = "Saved views rebuilt without rescanning. Original scan coverage remains " + row.State.ToLowerInvariant() + ".";
         }
     }
 }
