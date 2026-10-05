@@ -38,6 +38,7 @@ public sealed partial class IndexStore : IDisposable
         CREATE TABLE IF NOT EXISTS cleanup(id TEXT PRIMARY KEY,original TEXT NOT NULL,destination TEXT NOT NULL,identity TEXT NOT NULL,state TEXT NOT NULL,time TEXT NOT NULL,error TEXT);
 
         """);
+        EnsureCompositionSchema();
     }
     public void RecoverInterrupted() => Execute("UPDATE snapshots SET state='Interrupted' WHERE state='Scanning';");
     public long CreateSnapshot(string[] roots)
@@ -73,6 +74,7 @@ public sealed partial class IndexStore : IDisposable
     {
         CreateQueryIndexes(snapshot);
         RebuildFolders(snapshot);
+        BuildComposition(snapshot);
         var summary = GetSummaryRaw(snapshot);
         CacheSummaries(snapshot, summary);
         Execute("UPDATE snapshots SET state=$state,files=$files,logical=$logical,allocated=$allocated,errors=$errors WHERE id=$s;",
