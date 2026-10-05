@@ -4,6 +4,9 @@ Fixes excessive finalization time on drives with many nested directories.
 
 ## Changes
 
+- Build folder ranking indexes after aggregation, provision bounded SQLite caches for large inventories, and avoid repeating the entire type-classification mapping for each category sum.
+- MFTs with more than one million records permit up to two million directory ancestors / estimated 384 MiB, instead of always falling back at 250,000. This raises the bounded ancestry allowance; large-volume combined memory and live raw throughput remain unverified.
+
 - Treemap child lookups and drive allocated-folder rankings use indexed seeks; first navigation also prepares these indexes for saved snapshots from earlier versions.
 
 - Folder initialization reads saved roots and indexed directory rows rather than sorting the entire inventory. Progress now identifies initialization, allocation owners, direct totals, and every rollup depth.
@@ -24,7 +27,7 @@ Close an old FileViz process before upgrading: replacing its binaries cannot pat
 
 ## Verification and limits
 
-- Release build: zero warnings/errors; all 58 regression tests passed.
+- Release build: zero warnings/errors; all 59 regression tests passed.
 - Branching metadata fixture, 8,000 files / 16,000 folders: finalization 55.19 → 5.66 seconds. Patched 100,000 files / 200,000 folders: 33.29 seconds, 123.43 MiB peak working set. Single runs under shared load; no end-to-end scan speed claim. [Evidence](https://github.com/gduplessy/fileviz/blob/main/docs/evidence/folder-rollup-0.2.2.json).
 - Disposable tests verify hard-link allocation once per identity, unknown allocation, empty folders, repeat rebuilds, and actual executing-query cancellation within two seconds.
 - A visible desktop fixture confirms recovery uses saved inventory even when new files exist on disk, preserves interrupted coverage, and displays usable file/treemap/duplicate views.

@@ -2,12 +2,15 @@
 
 ## 0.2.3 — preview
 
+- Defer folder ranking indexes until totals are computed, use bounded main/temporary SQLite caches suited to database size, and classify file types with constant extension sets. Verify SQL category and age totals against the core classifier for every known extension.
+- Large MFTs support up to two million directory ancestors / an estimated 384 MiB, retaining fallback at the limit; smaller MFTs keep the previous limits.
+
 - Index child-folder navigation and allocated folder rankings after aggregation; use the stored drive root for ranking queries instead of an inventory-wide path filter.
 
 - Initialize folder views from saved roots and indexed directory rows; avoid reading and sorting every file to rediscover roots.
 - Report folder initialization, allocation-owner discovery, direct totals, and individual rollup depths during recovery and finalization.
 - Mark SQLite view failures as failed and retain the inventory for retry; surface the failure in the desktop UI.
-- Include the 0.2.2 indexed aggregation and cancellation fixes, with 58 passing regressions.
+- Include the 0.2.2 indexed aggregation and cancellation fixes, with 59 passing regressions.
 
 ## 0.2.2 — preview
 
