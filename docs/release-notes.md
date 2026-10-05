@@ -1,13 +1,21 @@
-# FileViz 0.1.0 preview
+# FileViz 0.1.1 preview
 
-Windows 11 x64 disk analysis with native directory enumeration, elevated read-only NTFS MFT scanning, SQLite snapshots, treemap navigation, filters, reports, and content duplicate review.
+Windows 11 x64 disk analysis and duplicate review, packaged from the latest committed source and documentation.
 
-- Per-drive views, selected folder/share roots, exclusions, and saved scan profiles.
-- Size filtering, sampling, then full SHA-256 hashes; optional SHA-1, MD5, or name candidates.
-- Explicitly reviewed same-volume quarantine, fresh byte and alternate-stream verification, journaled restore, and Windows Recycle Bin requests.
-- Self-contained portable ZIP and per-user installer. No runtime installation required.
-- Local-only storage; no telemetry, automatic deletion, automatic updates, or drivers.
+## Changes
 
-This is a preview release. Review the published performance report and validation matrix for measured results and remaining coverage. Filesystems can change while scanning; snapshots are observations rather than atomic backups. Raw scanner failures discard their entries and visibly fall back to directory enumeration.
+- Redesigned GitHub README: original SVG banners, build/release badges, direct download buttons, theme-aware desktop screenshots, GitHub callouts, and collapsible setup instructions.
+- Updated self-contained portable ZIP and per-user installer. No .NET installation is required.
+- Scan engines, content duplicate analysis, and reviewed cleanup behavior remain as in 0.1.0.
 
-Packages are currently unsigned. Verify SHA256SUMS.txt before use. SmartScreen may display an unsigned-publisher prompt.
+## Download
+
+- **Installer:** `FileViz-0.1.1-win-x64-setup.exe`, per-user installation and Start menu integration.
+- **Portable:** `FileViz-0.1.1-win-x64-portable.zip`, extract the entire archive and launch `FileViz.exe`.
+- **Verify:** use the SHA-256 values in the accompanying `SHA256SUMS.txt`.
+
+## Preview status
+
+Raw NTFS fixture parity passes, but the 2× MFT speed target is unmet on the small cached fixture. Combined UI/worker memory on real million-file volumes and the full provider matrix remain unverified. See the [performance report](https://github.com/gduplessy/fileviz/blob/main/docs/performance.md) and [validation matrix](https://github.com/gduplessy/fileviz/blob/main/docs/validation.md).
+
+Packages are unsigned; Windows SmartScreen may prompt. Cleanup requires explicitly reviewed selections and fresh identity/content checks. Quarantine and Recycle Bin requests do not immediately reclaim disk space. Data stays local; no telemetry, automatic updates, or automatic deletion.
