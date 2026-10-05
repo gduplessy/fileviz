@@ -1,32 +1,27 @@
-# FileViz 0.2.0 preview
+# FileViz 0.2.1 preview
 
-Windows 11 x64 disk analysis and duplicate review, redesigned as a native Windows 11 app.
+A scan progress and hard-link indexing fix for Windows 11 x64.
 
 ## Changes
 
-- **Windows 11 design:** Fluent controls, Mica, your Windows accent color, system/light/dark themes (and High Contrast), Snap Layouts, a title bar search (Ctrl+F), and a left navigation pane: Home, Explorer, Duplicates, Compare, Cleanup, Diagnostics, and Settings.
-- **Home:** first-run screen, drive cards with capacity and the latest snapshot state, and live scan progress, including MFT records read on raw scans.
-- **Explorer:** a two-level space map colored by file type or by age, a usage bar that shows space not attributed to files, breadcrumb navigation, and an inspector with allocation notes and shell actions. Snapshots taken by earlier versions need a rescan before they can be colored.
-- **Duplicates:** counts at each stage of the size, sample, and full-hash pipeline; group cards with explicit Keep and Remove choices; and a review window that prechecks identity, metadata, bytes, and named streams for every file before quarantine. Only files that pass are moved, and each move revalidates.
-- **Compare, Cleanup, Diagnostics:** totals for every change and the folders that changed most; held space and per-file details for quarantine; diagnostics grouped into coverage gaps, warnings, and items not traversed.
-- **Settings** are saved: theme, map coloring, scan and duplicate defaults, and saved profiles.
-- Existing index databases are upgraded in place. Scan engines and cleanup safety rules are unchanged.
+- Large scans now show what happens after enumeration: hard-link discovery/refresh, each query index, folder totals, file-type and age totals, and snapshot saving. Finalization can still take many minutes on multi-million-entry volumes.
+- Hard-link metadata writes use transactions of at most 64 entries and skip unchanged metadata. Identity checks, canonicalization across aliases, and unknown allocation are preserved.
+- Elapsed time uses a monotonic timer and no longer wraps after an hour. File counts exclude directories; directory fallback resets discarded raw-scan counters and progress.
+- Pause applies at metadata batches and finalization step boundaries. Cancellation can still wait while partial snapshot views are saved; this preview does not promise immediate cancellation during finalization.
 
 ## Download
 
-- **Installer:** `FileViz-0.2.0-win-x64-setup.exe`, per-user installation and Start menu integration. Upgrades keep local snapshots.
-- **Portable:** `FileViz-0.2.0-win-x64-portable.zip`, extract the entire archive and launch `FileViz.exe`.
-- **Verify:** use the SHA-256 values in the accompanying `SHA256SUMS.txt`.
+- **Installer:** `FileViz-0.2.1-win-x64-setup.exe`, per-user installation.
+- **Portable:** `FileViz-0.2.1-win-x64-portable.zip`, extract the whole archive and launch `FileViz.exe`.
+- **Verify:** compare the package with the attached `SHA256SUMS.txt`.
 
-## Preview status
+Allow a running scan to finish before upgrading. Upgrades preserve local snapshots; installing this patch does not change an already-running process.
 
-Raw NTFS fixture parity passes, but the 2× MFT speed target is unmet on the small cached fixture. Combined UI/worker memory on real million-file volumes and the full provider matrix remain unverified. See the [performance report](https://github.com/gduplessy/fileviz/blob/main/docs/performance.md) and [validation matrix](https://github.com/gduplessy/fileviz/blob/main/docs/validation.md).
+## Verification and limits
 
-Packages are unsigned; Windows SmartScreen may prompt. Cleanup requires explicitly reviewed selections and fresh identity/content checks. Quarantine and Recycle Bin requests do not immediately reclaim disk space. Data stays local; no telemetry, automatic updates, or automatic deletion.
+- Release build: zero warnings/errors; all 53 tests passed.
+- Desktop fixture: 304 files including two real hard-link aliases, expected duplicate pair, zero diagnostics. Smoke assertions verify that hard-link discovery and snapshot finalization reach the UI.
+- Synthetic 5,000-group hard-link database benchmark: unchanged refresh 1.19 → 0.60 seconds; changed refresh 1.40 → 0.50 seconds. These are single runs under shared load, exclude filesystem reads, and are not end-to-end scan speed claims. [Evidence](https://github.com/gduplessy/fileviz/blob/main/docs/evidence/alias-refresh-0.2.1.json)
+- Query-index construction and aggregate generation are unchanged. Raw MFT can still fall back to directory enumeration for unsupported or inconsistent metadata; see Diagnostics after completion.
 
-## Verification
-
-- Release build: zero warnings and errors; all 44 tests passed, including composition totals, the space-map layout, cleanup precheck agreement with the move, compare totals, diagnostic kinds, and legacy database migration.
-- Visible desktop smoke in light and dark themes: 303 disposable fixture files, expected duplicate pair, zero diagnostics, populated space map. Every section, the review window, and a two-snapshot comparison were captured and reviewed.
-- Synthetic index benchmarks with type and age totals: finalize +5.3% at one million entries and +1.7% at ten million, memory and query targets met.
-- Locally built ZIP and installer: checksums verified; with SDK paths removed, both ran the visible smoke (303 files, expected duplicate pair, zero diagnostics); per-user install and uninstall exited successfully. CI rebuilds the attached packages, so use the checksums attached to this release. [Local package validation](https://github.com/gduplessy/fileviz/blob/main/docs/evidence/packages-0.2.0-local.json)
+Packages remain unsigned previews. The raw 2× throughput target and full provider matrix remain unverified or unmet; see [performance](https://github.com/gduplessy/fileviz/blob/main/docs/performance.md) and [validation](https://github.com/gduplessy/fileviz/blob/main/docs/validation.md). No telemetry, automatic updates, or automatic deletion.

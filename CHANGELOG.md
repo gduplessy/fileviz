@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.1 — preview
+
+- Show hard-link discovery and refresh, all seven query-index steps, folder/type/age totals, and snapshot saving while finalizing large scans. Clear stale MFT progress when directory fallback begins.
+- Commit hard-link metadata in batches of at most 64, skip unchanged updates, and preserve identity checks and unknown allocation.
+- Keep elapsed time accurate beyond an hour or a day using a monotonic timer. Count files separately from directories and discard failed raw-scan totals when falling back.
+- Pause hard-link batches and finalization step boundaries; explain that saving partial results can continue after cancellation.
+- Add a reproducible hard-link metadata benchmark and regression coverage for no-op writes, transaction rollback, bounded batches, fallback counters, and elapsed time.
+
 ## 0.2.0 — preview
 
 - Windows 11 Fluent theme with Mica, the Windows accent color, and system, light, or dark mode chosen in Settings.

@@ -1,0 +1,31 @@
+{
+  "MeasuredDate": "2026-10-05",
+  "BeforeSource": "9491f5e",
+  "AfterSource": "01fc731",
+  "Scope": "Synthetic hard-link metadata writes only; no filesystem reads or end-to-end scan timing",
+  "Conditions": "Sequential single runs while a separate real-volume FileViz scan was finalizing; shared machine load was not isolated",
+  "Before": {
+    "Kind": "Synthetic hard-link metadata writes (no filesystem reads)",
+    "Groups": 5000,
+    "Files": 10000,
+    "Mode": "Individual transactions",
+    "PrepareSeconds": 0.0423994,
+    "UnchangedSeconds": 1.1878231,
+    "ChangedSeconds": 1.399017,
+    "Runtime": "10.0.12",
+    "OS": "Microsoft Windows NT 10.0.26100.0",
+    "CpuCount": 12
+  },
+  "After": {
+    "Kind": "Synthetic hard-link metadata writes (no filesystem reads)",
+    "Groups": 5000,
+    "Files": 10000,
+    "Mode": "64 entries per transaction",
+    "PrepareSeconds": 0.0374672,
+    "UnchangedSeconds": 0.6002158,
+    "ChangedSeconds": 0.5048363,
+    "Runtime": "10.0.12",
+    "OS": "Microsoft Windows NT 10.0.26100.0",
+    "CpuCount": 12
+  }
+}

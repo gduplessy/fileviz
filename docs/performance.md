@@ -17,6 +17,19 @@ The million-entry index used 834,646,016 database bytes; the ten-million-entry i
 
 Both index processes met their component memory budgets (512 MiB / 1 GiB) and the 500 ms primary-query budget. This is not a combined UI/worker measurement. A separate visible desktop smoke run indexed 303 files / 40 MiB and found the expected SHA-256 duplicate pair, with zero diagnostics; its UI process peaked at 169.18 MiB. Combined working sets on real million/ten-million-file volumes remain unverified.
 
+## Hard-link metadata refresh (0.2.1)
+
+On 2026-10-05, a synthetic database with 5,000 independent hard-link groups (10,000 entries) measured the metadata-write phase separately. Before the fix, each refreshed identity rewrote all its aliases in its own transaction, even when metadata already matched. The revised pipeline collects up to 64 worker results before writing, commits them together, and updates only changed rows. No write transaction is held while waiting for filesystem metadata.
+
+| Metadata | Before | After |
+| --- | --- | --- |
+| Already matches | 1.1878 s | 0.6002 s |
+| Changed length and change timestamp | 1.3990 s | 0.5048 s |
+
+These are sequential single runs on the machine above, while another FileViz process was finalizing a real-volume scan. They exclude filesystem reads and do not establish full-drive speedups. Final query indexes and folder/type/age aggregates are unchanged and can take many minutes on large inventories. The UI now reports these stages explicitly, clears stale MFT progress after fallback, and keeps elapsed time accurate beyond an hour. Cancellation during finalization still waits for partial views to be saved. [Evidence](evidence/alias-refresh-0.2.1.json).
+
+Reproduce the revised pipeline with `dotnet run --project tools/FileViz.Benchmarks -c Release -- --aliases 5000 artifacts/benchmarks/new-aliases`. `--unbatched` measures individual transactions using the loaded Data assembly; reproducing the original unconditional updates requires the pre-fix `FileViz.Data.dll` from commit `9491f5e`. The regression suite verifies zero writes for unchanged metadata, all-alias canonicalization, null allocation handling, identity rejection, and rollback of a failed batch.
+
 ## Disposable NTFS fixture
 
 A dedicated dynamically expanding 1 GiB VHD was formatted as NTFS after verifying its file-backed disk identity. Its `data` tree contains 10,000 small files, 100 hard-link aliases, alternate streams, resident data, compressed zeros, a sparse file, Unicode names, long paths, and a junction. The image is detached after each run; existing physical disks are never formatted.
