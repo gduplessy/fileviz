@@ -32,3 +32,5 @@ Machine-readable reports live in [evidence](evidence/). The [final package repor
 The [0.1.1 package report](evidence/packages-0.1.1.json) verifies the downloaded installer and ZIP, executable version/source commit, and the refreshed packaged README. Both visible smokes passed with 303 fixture files, two duplicate rows, and no diagnostics; installation and uninstallation exited successfully.
 
 The [0.2.0 local package report](evidence/packages-0.2.0-local.json) covers the locally built installer and ZIP of the redesign: checksums verified, both visible smokes passed with 303 fixture files, two duplicate rows, and no diagnostics, and installation and uninstallation exited successfully.
+
+The [0.2.0 release report](evidence/packages-0.2.0.json) verifies the downloaded release installer and ZIP: checksums match the attached `SHA256SUMS.txt`, the executable reports version 0.2.0 from the tagged commit, both visible smokes passed with 303 fixture files, two duplicate rows, and no diagnostics, and installation and uninstallation exited successfully.

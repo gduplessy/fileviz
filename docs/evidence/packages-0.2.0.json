@@ -1,0 +1,34 @@
+{
+  "Portable": {
+    "Status": "Duplicate analysis complete. Cleanup performs fresh byte and stream verification.",
+    "SummaryText": "303 files · 39.5 MiB logical · 39.5 MiB reported allocation",
+    "Rows": 250,
+    "DuplicateRows": 2,
+    "PeakWorkingSet": 197832704,
+    "Snapshots": 1,
+    "Errors": 0,
+    "RenderedVisibleWindow": true
+  },
+  "Installed": {
+    "Status": "Duplicate analysis complete. Cleanup performs fresh byte and stream verification.",
+    "SummaryText": "303 files · 39.5 MiB logical · 39.5 MiB reported allocation",
+    "Rows": 250,
+    "DuplicateRows": 2,
+    "PeakWorkingSet": 197447680,
+    "Snapshots": 1,
+    "Errors": 0,
+    "RenderedVisibleWindow": true
+  },
+  "InstallerExitCode": 0,
+  "UninstallerExitCode": 0,
+  "ChecksumsVerified": true,
+  "DeveloperRuntimeRemovedFromEnvironment": true,
+  "OS": "Microsoft Windows NT 10.0.26100.0",
+  "ValidatedUtc": "2026-10-05T10:52:17.4806472Z",
+  "Source": "Downloaded GitHub release v0.2.0 assets",
+  "ExecutableVersion": "0.2.0+7f3673d863a8e0c11978731e36741d38c7753b4c",
+  "Assets": {
+    "FileViz-0.2.0-win-x64-portable.zip": 103811678,
+    "FileViz-0.2.0-win-x64-setup.exe": 73307460
+  }
+}
