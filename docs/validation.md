@@ -16,3 +16,5 @@ Claims below distinguish automated fixtures, a rendered live desktop, and unveri
 
 Only disposable fixtures are used for cleanup tests. User files are never automatically selected or modified during validation. Structural raw failures discard raw entries and restart directory enumeration; incomplete coverage remains visible. Quarantine and Recycle Bin requests retain or dispose data separately from potential-savings estimates.
 Machine-readable reports live in [evidence](evidence/). The [final package report](evidence/packages-release.json) validates the exact downloaded `v0.1.0` release assets, including the root/treemap assertion. Package validation is reproducible with scripts/validate-package.ps1; it uses only workspace-owned disposable files and refuses to overwrite an existing user installation.
+
+The [0.1.1 package report](evidence/packages-0.1.1.json) verifies the downloaded installer and ZIP, executable version/source commit, and the refreshed packaged README. Both visible smokes passed with 303 fixture files, two duplicate rows, and no diagnostics; installation and uninstallation exited successfully.
