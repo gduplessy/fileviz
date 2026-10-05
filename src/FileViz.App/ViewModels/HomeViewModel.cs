@@ -360,6 +360,11 @@ public sealed class HomeViewModel : Bindable, ISnapshotSection
                         state = "Cancelled";
                         writer.SetState(snapshot, state);
                     }
+                    catch (Microsoft.Data.Sqlite.SqliteException e)
+                    {
+                        state = "Failed";
+                        writer.AddError(snapshot, "", "Saving snapshot views failed: " + e.Message);
+                    }
                 });
             }
             finally { scanTimer.Stop(); ScanElapsed = Format.Elapsed(scanTimer.Elapsed); clock.Stop(); session.EndWork(); }
@@ -419,6 +424,10 @@ public sealed class HomeViewModel : Bindable, ISnapshotSection
             ready = true;
         }
         catch (OperationCanceledException) { session.Status = "Rebuild cancelled. Saved inventory retained."; }
+        catch (Exception e) when (e is Microsoft.Data.Sqlite.SqliteException or IOException or UnauthorizedAccessException)
+        {
+            session.Status = "Rebuild failed. Saved inventory retained: " + e.Message;
+        }
         finally
         {
             scanTimer.Stop();

@@ -90,6 +90,12 @@ public sealed partial class IndexStore : IDisposable
         {
             throw new OperationCanceledException("Snapshot finalization cancelled.", e, token);
         }
+        catch (SqliteException)
+        {
+            commandCancellation = default;
+            SetState(snapshot, "Failed");
+            throw;
+        }
         finally { commandCancellation = default; }
     }
 
