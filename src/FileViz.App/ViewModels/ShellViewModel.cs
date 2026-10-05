@@ -98,7 +98,7 @@ public sealed class ShellViewModel : Bindable, IDisposable
         Duplicates = new(Session, Cleanup);
         Compare = new(Session);
         Diagnostics = new(Session);
-        Settings = new(Session);
+        Settings = new(Session, Home, Explorer, Duplicates);
         Session.Register(Home);
         Session.Register(Explorer);
         Session.Register(Duplicates);
@@ -143,6 +143,7 @@ public sealed class ShellViewModel : Bindable, IDisposable
     public async Task InitializeAsync()
     {
         await Home.InitializeAsync();
+        Settings.Load();
         Session.ReloadHistory();
         Cleanup.Reload();
         if (Session.History.Count > 0)

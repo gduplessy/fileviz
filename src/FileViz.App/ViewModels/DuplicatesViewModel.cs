@@ -116,7 +116,10 @@ public sealed class DuplicatesViewModel : Bindable, ISnapshotSection
         get => Algorithm == "MD5"; set { if (value) Algorithm = "MD5"; }
     }
     public bool CrossDrive { get; set; } = false;
-    public string PreferredFolder { get; set; } = "";
+    private string preferredFolder = ""; public string PreferredFolder
+    {
+        get => preferredFolder; set => Set(ref preferredFolder, value);
+    }
     public string ScopeText => CrossDrive ? "Selected roots" : session.CurrentRoot ?? "No root";
     private DuplicateRun? run; public DuplicateRun? Run
     {

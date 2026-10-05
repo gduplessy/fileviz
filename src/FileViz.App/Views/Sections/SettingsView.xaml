@@ -1,63 +1,163 @@
 <UserControl x:Class="FileViz.App.Views.Sections.SettingsView" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
  <UserControl.Resources>
-  <Style x:Key="SettingRow" TargetType="Border"><Setter Property="Padding" Value="16,12"/><Setter Property="MinHeight" Value="64"/><Setter Property="BorderBrush" Value="{DynamicResource DividerStrokeColorDefaultBrush}"/><Setter Property="BorderThickness" Value="0,1,0,0"/></Style>
+  <Style x:Key="Row" TargetType="Border"><Setter Property="Padding" Value="16,12"/><Setter Property="MinHeight" Value="64"/><Setter Property="BorderBrush" Value="{DynamicResource DividerStrokeColorDefaultBrush}"/><Setter Property="BorderThickness" Value="0,1,0,0"/></Style>
+  <Style x:Key="FirstRow" TargetType="Border" BasedOn="{StaticResource Row}"><Setter Property="BorderThickness" Value="0"/></Style>
+  <Style x:Key="RowIcon" TargetType="TextBlock" BasedOn="{StaticResource Icon}"><Setter Property="FontSize" Value="20"/><Setter Property="Margin" Value="0,0,16,0"/><Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}"/></Style>
+  <Style x:Key="Group" TargetType="TextBlock" BasedOn="{StaticResource BodyStrongText}"><Setter Property="Margin" Value="0,0,0,8"/></Style>
  </UserControl.Resources>
  <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
-  <StackPanel Margin="{StaticResource PagePadding}" MaxWidth="1000" HorizontalAlignment="Left">
+  <StackPanel Margin="{StaticResource PagePadding}">
    <TextBlock Text="Settings" Style="{StaticResource TitleText}" Margin="0,0,0,20"/>
-
-   <TextBlock Text="Appearance" Style="{StaticResource BodyStrongText}" Margin="0,0,0,8"/>
-   <Border Style="{StaticResource Card}" Padding="0" Margin="0,0,0,24">
+   <Grid>
+    <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="24"/><ColumnDefinition/></Grid.ColumnDefinitions>
     <StackPanel>
-     <Border Style="{StaticResource SettingRow}" BorderThickness="0">
-      <DockPanel>
-       <ComboBox DockPanel.Dock="Right" Width="220" VerticalAlignment="Center" ItemsSource="{Binding Themes}" SelectedItem="{Binding Theme}" AutomationProperties.Name="App theme"/>
-       <TextBlock Style="{StaticResource Icon}" FontSize="20" Text="&#xE790;" Margin="0,0,16,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
-       <StackPanel VerticalAlignment="Center"><TextBlock Text="App theme"/><TextBlock Text="Follows Windows light or dark mode by default" Style="{StaticResource CaptionText}"/></StackPanel>
-      </DockPanel>
-     </Border>
-     <Border Style="{StaticResource SettingRow}">
-      <DockPanel>
-       <Button DockPanel.Dock="Right" Style="{StaticResource SubtleButton}" Command="{Binding ColorSettingsCommand}" VerticalAlignment="Center" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}">
-        <StackPanel Orientation="Horizontal"><TextBlock Text="Windows color settings"/><TextBlock Style="{StaticResource Icon}" FontSize="12" Text="&#xE8A7;" Margin="8,0,0,0"/></StackPanel>
-       </Button>
-       <TextBlock Style="{StaticResource Icon}" FontSize="20" Text="&#xE771;" Margin="0,0,16,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
-       <StackPanel VerticalAlignment="Center"><TextBlock Text="Accent color"/><TextBlock Text="FileViz uses your Windows accent color" Style="{StaticResource CaptionText}"/></StackPanel>
-      </DockPanel>
-     </Border>
-    </StackPanel>
-   </Border>
-
-   <TextBlock Text="Storage and privacy" Style="{StaticResource BodyStrongText}" Margin="0,0,0,8"/>
-   <Border Style="{StaticResource Card}" Padding="0" Margin="0,0,0,24">
-    <StackPanel>
-     <Border Style="{StaticResource SettingRow}" BorderThickness="0">
-      <DockPanel>
-       <TextBlock Style="{StaticResource Icon}" FontSize="20" Text="&#xE8B7;" Margin="0,0,16,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
-       <StackPanel VerticalAlignment="Center"><TextBlock Text="Index database"/><TextBlock Text="{Binding IndexPath}" Style="{StaticResource MonoText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/></StackPanel>
-      </DockPanel>
-     </Border>
-     <Border Style="{StaticResource SettingRow}">
-      <DockPanel>
-       <TextBlock Style="{StaticResource Icon}" FontSize="20" Text="&#xE72E;" Margin="0,0,16,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
-       <StackPanel VerticalAlignment="Center"><TextBlock Text="Local only"/><TextBlock Text="No telemetry, automatic deletion, automatic updates, drivers, or remote storage." Style="{StaticResource CaptionText}" TextWrapping="Wrap"/></StackPanel>
-      </DockPanel>
-     </Border>
-    </StackPanel>
-   </Border>
-
-   <TextBlock Text="About" Style="{StaticResource BodyStrongText}" Margin="0,0,0,8"/>
-   <Border Style="{StaticResource Card}" Padding="0">
-    <Border Style="{StaticResource SettingRow}" BorderThickness="0">
-     <DockPanel>
-      <TextBlock Style="{StaticResource Icon}" FontSize="20" Text="&#xE946;" Margin="0,0,16,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
-      <StackPanel VerticalAlignment="Center">
-       <TextBlock><Run Text="FileViz "/><Run Text="{Binding Version, Mode=OneTime}"/><Run Text=" Preview"/></TextBlock>
-       <TextBlock Text="GPL-3.0-only · Third-party notices ship with the app" Style="{StaticResource CaptionText}"/>
+     <TextBlock Text="Appearance" Style="{StaticResource Group}"/>
+     <Border Style="{StaticResource Card}" Padding="0" Margin="0,0,0,24">
+      <StackPanel>
+       <Border Style="{StaticResource FirstRow}">
+        <DockPanel>
+         <ComboBox DockPanel.Dock="Right" Width="200" VerticalAlignment="Center" ItemsSource="{Binding Themes}" SelectedItem="{Binding Theme}" AutomationProperties.Name="App theme"/>
+         <TextBlock Style="{StaticResource RowIcon}" Text="&#xE790;"/>
+         <StackPanel VerticalAlignment="Center"><TextBlock Text="App theme"/><TextBlock Text="Follows Windows light or dark mode by default" Style="{StaticResource CaptionText}"/></StackPanel>
+        </DockPanel>
+       </Border>
+       <Border Style="{StaticResource Row}">
+        <DockPanel>
+         <Button DockPanel.Dock="Right" Style="{StaticResource SubtleButton}" Command="{Binding ColorSettingsCommand}" VerticalAlignment="Center" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}">
+          <StackPanel Orientation="Horizontal"><TextBlock Text="Windows color settings"/><TextBlock Style="{StaticResource Icon}" FontSize="12" Text="&#xE8A7;" Margin="8,0,0,0"/></StackPanel>
+         </Button>
+         <TextBlock Style="{StaticResource RowIcon}" Text="&#xE771;"/>
+         <StackPanel VerticalAlignment="Center"><TextBlock Text="Accent color"/><TextBlock Text="FileViz uses your Windows accent color" Style="{StaticResource CaptionText}"/></StackPanel>
+        </DockPanel>
+       </Border>
+       <Border Style="{StaticResource Row}">
+        <DockPanel>
+         <Border DockPanel.Dock="Right" Style="{StaticResource SegmentTrack}">
+          <StackPanel Orientation="Horizontal">
+           <RadioButton Style="{StaticResource Segment}" GroupName="DefaultMap" Content="Type" IsChecked="{Binding MapByType}"/>
+           <RadioButton Style="{StaticResource Segment}" GroupName="DefaultMap" Content="Age" IsChecked="{Binding MapByAge}"/>
+          </StackPanel>
+         </Border>
+         <TextBlock Style="{StaticResource RowIcon}" Text="&#xF0E2;"/>
+         <StackPanel VerticalAlignment="Center"><TextBlock Text="Space map colors"/><TextBlock Text="Remembered from the last choice in Explorer" Style="{StaticResource CaptionText}"/></StackPanel>
+        </DockPanel>
+       </Border>
       </StackPanel>
-     </DockPanel>
-    </Border>
-   </Border>
+     </Border>
+
+     <TextBlock Text="Scanning" Style="{StaticResource Group}"/>
+     <Border Style="{StaticResource Card}" Padding="0" Margin="0,0,0,24">
+      <StackPanel>
+       <Border Style="{StaticResource FirstRow}">
+        <DockPanel>
+         <CheckBox DockPanel.Dock="Right" Style="{StaticResource Switch}" IsChecked="{Binding PreferMft}" VerticalAlignment="Center" AutomationProperties.Name="Prefer raw MFT"/>
+         <TextBlock Style="{StaticResource RowIcon}" Text="&#xEDA2;"/>
+         <StackPanel VerticalAlignment="Center"><TextBlock Text="Prefer raw MFT"/><TextBlock Text="Whole local NTFS volumes only. Falls back to directory scan with a diagnostic." Style="{StaticResource CaptionText}" TextWrapping="Wrap"/></StackPanel>
+        </DockPanel>
+       </Border>
+       <Border Style="{StaticResource Row}">
+        <DockPanel>
+         <CheckBox DockPanel.Dock="Right" Style="{StaticResource Switch}" IsChecked="{Binding Administrator}" VerticalAlignment="Center" AutomationProperties.Name="Administrator scan by default"/>
+         <TextBlock Style="{StaticResource RowIcon}" Text="&#xEA18;"/>
+         <StackPanel VerticalAlignment="Center"><TextBlock Text="Administrator scan by default"/><TextBlock Text="Each scan asks through UAC for a read-only worker" Style="{StaticResource CaptionText}"/></StackPanel>
+        </DockPanel>
+       </Border>
+       <Border Style="{StaticResource Row}">
+        <StackPanel>
+         <DockPanel>
+          <TextBlock Style="{StaticResource RowIcon}" Text="&#xE71C;"/>
+          <StackPanel VerticalAlignment="Center"><TextBlock Text="Default exclusions"/><TextBlock Text="One per line: absolute folder prefix or filename wildcard" Style="{StaticResource CaptionText}"/></StackPanel>
+         </DockPanel>
+         <TextBox Text="{Binding Exclusions, UpdateSourceTrigger=LostFocus}" AcceptsReturn="True" Height="72" VerticalScrollBarVisibility="Auto" FontFamily="{StaticResource MonoFont}" Margin="36,10,0,0" AutomationProperties.Name="Default exclusions"/>
+        </StackPanel>
+       </Border>
+       <Border Style="{StaticResource Row}">
+        <StackPanel>
+         <DockPanel>
+          <TextBlock Style="{StaticResource RowIcon}" Text="&#xE81C;"/>
+          <StackPanel VerticalAlignment="Center"><TextBlock Text="Scan profiles"/><TextBlock Text="Saved roots, exclusions, and engine preference. Save new ones from Home." Style="{StaticResource CaptionText}"/></StackPanel>
+         </DockPanel>
+         <TextBlock Text="No saved profiles." Margin="36,8,0,0">
+          <TextBlock.Style><Style TargetType="TextBlock" BasedOn="{StaticResource CaptionText}"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding Home.Profiles.Count}" Value="0"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></TextBlock.Style>
+         </TextBlock>
+         <ItemsControl ItemsSource="{Binding Home.Profiles}" Margin="36,6,0,0" Focusable="False">
+          <ItemsControl.ItemTemplate>
+           <DataTemplate>
+            <DockPanel Margin="0,2">
+             <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Content="&#xE74D;" Command="{Binding DataContext.DeleteProfileCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}" AutomationProperties.Name="Delete profile" ToolTip="Delete profile"/>
+             <StackPanel VerticalAlignment="Center"><TextBlock Text="{Binding Name}"/><TextBlock Text="{Binding Roots.Length, StringFormat={}{0} roots}" Style="{StaticResource CaptionText}"/></StackPanel>
+            </DockPanel>
+           </DataTemplate>
+          </ItemsControl.ItemTemplate>
+         </ItemsControl>
+        </StackPanel>
+       </Border>
+      </StackPanel>
+     </Border>
+    </StackPanel>
+
+    <StackPanel Grid.Column="2">
+     <TextBlock Text="Duplicates" Style="{StaticResource Group}"/>
+     <Border Style="{StaticResource Card}" Padding="0" Margin="0,0,0,24">
+      <StackPanel>
+       <Border Style="{StaticResource FirstRow}">
+        <DockPanel>
+         <ComboBox DockPanel.Dock="Right" Width="140" VerticalAlignment="Center" ItemsSource="{Binding Algorithms}" SelectedItem="{Binding Algorithm}" AutomationProperties.Name="Hash algorithm"/>
+         <TextBlock Style="{StaticResource RowIcon}" Text="&#xE8C8;"/>
+         <StackPanel VerticalAlignment="Center"><TextBlock Text="Hash algorithm"/><TextBlock Text="SHA-1 and MD5 are for compatibility only" Style="{StaticResource CaptionText}"/></StackPanel>
+        </DockPanel>
+       </Border>
+       <Border Style="{StaticResource Row}">
+        <StackPanel>
+         <DockPanel>
+          <TextBlock Style="{StaticResource RowIcon}" Text="&#xE8B7;"/>
+          <StackPanel VerticalAlignment="Center"><TextBlock Text="Preferred keeper folder"/><TextBlock Text="Guides suggested keepers. Never selects removals." Style="{StaticResource CaptionText}"/></StackPanel>
+         </DockPanel>
+         <TextBox Text="{Binding PreferredFolder, UpdateSourceTrigger=LostFocus}" FontFamily="{StaticResource MonoFont}" Margin="36,10,0,0" AutomationProperties.Name="Preferred keeper folder"/>
+        </StackPanel>
+       </Border>
+      </StackPanel>
+     </Border>
+
+     <TextBlock Text="Storage and privacy" Style="{StaticResource Group}"/>
+     <Border Style="{StaticResource Card}" Padding="0" Margin="0,0,0,24">
+      <StackPanel>
+       <Border Style="{StaticResource FirstRow}">
+        <DockPanel>
+         <Button DockPanel.Dock="Right" Content="Open folder" Command="{Binding OpenIndexFolderCommand}" VerticalAlignment="Center" Margin="12,0,0,0"/>
+         <TextBlock Style="{StaticResource RowIcon}" Text="&#xE8B7;"/>
+         <StackPanel VerticalAlignment="Center"><TextBlock><Run Text="Index database "/><Run Text="{Binding IndexSize, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/></TextBlock><TextBlock Text="{Binding IndexPath}" Style="{StaticResource MonoText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/></StackPanel>
+        </DockPanel>
+       </Border>
+       <Border Style="{StaticResource Row}">
+        <DockPanel>
+         <TextBlock Style="{StaticResource RowIcon}" Text="&#xE81C;"/>
+         <StackPanel VerticalAlignment="Center"><TextBlock Text="Snapshots"/><TextBlock Text="{Binding SnapshotsText}" Style="{StaticResource CaptionText}"/></StackPanel>
+        </DockPanel>
+       </Border>
+       <Border Style="{StaticResource Row}">
+        <DockPanel>
+         <TextBlock Style="{StaticResource RowIcon}" Text="&#xE72E;"/>
+         <StackPanel VerticalAlignment="Center"><TextBlock Text="Local only"/><TextBlock Text="No telemetry, automatic deletion, automatic updates, drivers, or remote storage. Keep the cleanup journal while files are held." Style="{StaticResource CaptionText}" TextWrapping="Wrap"/></StackPanel>
+        </DockPanel>
+       </Border>
+      </StackPanel>
+     </Border>
+
+     <TextBlock Text="About" Style="{StaticResource Group}"/>
+     <Border Style="{StaticResource Card}" Padding="0">
+      <Border Style="{StaticResource FirstRow}">
+       <DockPanel>
+        <TextBlock Style="{StaticResource RowIcon}" Text="&#xE946;"/>
+        <StackPanel VerticalAlignment="Center">
+         <TextBlock><Run Text="FileViz "/><Run Text="{Binding Version, Mode=OneTime}"/><Run Text=" Preview"/></TextBlock>
+         <TextBlock Text="GPL-3.0-only · Third-party notices ship with the app" Style="{StaticResource CaptionText}"/>
+        </StackPanel>
+       </DockPanel>
+      </Border>
+     </Border>
+    </StackPanel>
+   </Grid>
   </StackPanel>
  </ScrollViewer>
 </UserControl>

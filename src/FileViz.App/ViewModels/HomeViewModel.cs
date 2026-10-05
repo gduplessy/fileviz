@@ -19,7 +19,15 @@ public sealed class HomeViewModel : Bindable, ISnapshotSection
     public SessionViewModel Session => session;
     public ObservableCollection<DriveRow> Drives { get; } = [];
     public ObservableCollection<ScanProfile> Profiles { get; } = [];
-    public string ExtraRoots { get; set; } = ""; public string Exclusions { get; set; } = ".FileViz-Quarantine"; public bool PreferMft { get; set; } = true;
+    public string ExtraRoots { get; set; } = "";
+    private string exclusions = ".FileViz-Quarantine"; public string Exclusions
+    {
+        get => exclusions; set => Set(ref exclusions, value);
+    }
+    private bool preferMft = true; public bool PreferMft
+    {
+        get => preferMft; set => Set(ref preferMft, value);
+    }
     public string ProfileName { get; set; } = "My scan";
     private ScanProfile? selectedProfile; public ScanProfile? SelectedProfile
     {
@@ -34,9 +42,8 @@ public sealed class HomeViewModel : Bindable, ISnapshotSection
                 PreferMft = value.PreferMft;
                 ProfileName = value.Name;
                 Changed(nameof(ExtraRoots));
-                Changed(nameof(Exclusions));
-                Changed(nameof(PreferMft));
                 Changed(nameof(ProfileName));
+                Changed(nameof(ScanButtonText));
             }
         }
     }

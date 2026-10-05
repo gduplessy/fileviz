@@ -374,6 +374,7 @@ public sealed partial class IndexStore : IDisposable
     }
     public string? Setting(string key) => Scalar("SELECT value FROM settings WHERE key=$k;", ("$k", key)) as string;
     public void SaveSetting(string key, string value) => Execute("INSERT OR REPLACE INTO settings(key,value) VALUES($k,$v);", ("$k", key), ("$v", value));
+    public void DeleteProfile(string name) => Execute("DELETE FROM profiles WHERE name=$name;", ("$name", name));
     public void SaveProfile(ScanProfile profile) => Execute("INSERT OR REPLACE INTO profiles VALUES($name,$json);", ("$name", profile.Name), ("$json", JsonSerializer.Serialize(profile)));
     public List<ScanProfile> Profiles()
     {

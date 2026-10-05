@@ -89,6 +89,10 @@ public class CompareAndDiagnosticsTests
         store.SaveSetting("theme", "Dark");
         Assert.Equal("Dark", store.Setting("theme"));
         Assert.Null(store.Setting("missing"));
+        store.SaveProfile(new("Daily", [@"C:\Users"], ["*.tmp"], true));
+        Assert.Single(store.Profiles());
+        store.DeleteProfile("Daily");
+        Assert.Empty(store.Profiles());
         SqliteConnection.ClearAllPools();
     }
 }

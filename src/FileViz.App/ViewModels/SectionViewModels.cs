@@ -376,24 +376,3 @@ public sealed class DiagnosticsViewModel : Bindable, ISnapshotSection
     }
     private void Apply() => SessionViewModel.Replace(Rows, Filter == "All" ? all : all.Where(x => x.Severity.ToString() == Filter));
 }
-
-/// <summary>Appearance and application information.</summary>
-public sealed class SettingsViewModel : Bindable
-{
-    public string[] Themes { get; } = ["Use system setting", "Light", "Dark"];
-    private string theme = "Use system setting"; public string Theme
-    {
-        get => theme; set
-        {
-            if (Set(ref theme, value))
-                App.SetTheme(value switch { "Light" => System.Windows.ThemeMode.Light, "Dark" => System.Windows.ThemeMode.Dark, _ => System.Windows.ThemeMode.System });
-        }
-    }
-    public string Version => typeof(SettingsViewModel).Assembly.GetName().Version?.ToString(3) ?? "";
-    public string IndexPath
-    {
-        get;
-    }
-    public ICommand ColorSettingsCommand { get; } = new ActionCommand(() => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ms-settings:colors") { UseShellExecute = true }));
-    public SettingsViewModel(SessionViewModel session) => IndexPath = session.DatabasePath;
-}
