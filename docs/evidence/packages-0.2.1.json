@@ -1,0 +1,21 @@
+{
+  "Version": "0.2.1",
+  "SourceCommit": "bf8b8574151efe744db67dc7659adb7755f3b91b",
+  "ChecksumsVerified": true,
+  "DeveloperRuntimeRemovedFromEnvironment": true,
+  "InstallerTested": false,
+  "InstallerNote": "Downloaded and checksum verified; existing user installation and active scan were preserved",
+  "Portable": {
+    "Status": "Duplicate analysis complete. Cleanup performs fresh byte and stream verification.",
+    "SummaryText": "304 files · 37.75 MiB logical · 37.5 MiB reported allocation",
+    "Rows": 250,
+    "DuplicateRows": 2,
+    "PeakWorkingSet": 196710400,
+    "Snapshots": 1,
+    "Errors": 0,
+    "RenderedVisibleWindow": true
+  },
+  "SmokeExitCode": 0,
+  "ValidatedUtc": "2026-10-05T12:39:56.5977868Z",
+  "OS": "Microsoft Windows NT 10.0.26100.0"
+}
