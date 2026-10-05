@@ -15,7 +15,7 @@ Windows 11 x64, Git, and the SDK pinned in `global.json` are required. The proje
 For packages, install Inno Setup 6.7.3 and run:
 
 ```powershell
-./scripts/build-release.ps1 -Version 0.1.1 -Iscc 'C:/Program Files (x86)/Inno Setup 6/ISCC.exe'
+./scripts/build-release.ps1 -Version 0.2.0 -Iscc 'C:/Program Files (x86)/Inno Setup 6/ISCC.exe'
 ```
 
 Use a new output directory for each rebuild. The script never removes previous packages. Tagged CI builds generate a portable ZIP, per-user installer, and SHA-256 checksums. `docs/release.md` describes the release checklist.

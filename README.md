@@ -33,8 +33,8 @@
 ## Download
 
 <p>
-  <a href="https://github.com/gduplessy/fileviz/releases/download/v0.1.1/FileViz-0.1.1-win-x64-setup.exe"><img src="https://img.shields.io/badge/Download-Windows%20installer-1f6f8b?style=for-the-badge&amp;logo=github" alt="Download Windows installer"></a>
-  <a href="https://github.com/gduplessy/fileviz/releases/download/v0.1.1/FileViz-0.1.1-win-x64-portable.zip"><img src="https://img.shields.io/badge/Download-Portable%20ZIP-2b8a7a?style=for-the-badge&amp;logo=github" alt="Download portable ZIP"></a>
+  <a href="https://github.com/gduplessy/fileviz/releases/download/v0.2.0/FileViz-0.2.0-win-x64-setup.exe"><img src="https://img.shields.io/badge/Download-Windows%20installer-1f6f8b?style=for-the-badge&amp;logo=github" alt="Download Windows installer"></a>
+  <a href="https://github.com/gduplessy/fileviz/releases/download/v0.2.0/FileViz-0.2.0-win-x64-portable.zip"><img src="https://img.shields.io/badge/Download-Portable%20ZIP-2b8a7a?style=for-the-badge&amp;logo=github" alt="Download portable ZIP"></a>
 </p>
 
 | Package | Choose it when | How to run |
@@ -42,7 +42,7 @@
 | **Per-user installer** | You want Start menu integration and an uninstaller. | Run the setup executable. No administrator access is needed to install. |
 | **Portable ZIP** | You want to extract and run without installing. | Extract the **entire** archive, then launch `FileViz.exe`. Keep its `worker` folder beside it. |
 
-Both packages bundle the Windows x64 runtime; you do not need to install .NET. [All releases](https://github.com/gduplessy/fileviz/releases) · [v0.1.1 SHA-256 checksums](https://github.com/gduplessy/fileviz/releases/download/v0.1.1/SHA256SUMS.txt)
+Both packages bundle the Windows x64 runtime; you do not need to install .NET. [All releases](https://github.com/gduplessy/fileviz/releases) · [v0.2.0 SHA-256 checksums](https://github.com/gduplessy/fileviz/releases/download/v0.2.0/SHA256SUMS.txt)
 
 > [!NOTE]
 > Packages are currently unsigned. Windows SmartScreen may prompt before launch. Verify the checksum against the file attached to the same release.
@@ -56,9 +56,6 @@ Both packages bundle the Windows x64 runtime; you do not need to install .NET. [
 </picture>
 
 *Actual desktop, disposable sample data. The screenshot follows your GitHub color theme.*
-
-> [!NOTE]
-> These screenshots show the Windows 11 redesign on `main`, which ships in the next preview. The v0.1.1 packages above use the earlier single-window layout.
 
 | Color by age | Duplicate groups |
 | --- | --- |
@@ -93,9 +90,9 @@ Both packages bundle the Windows x64 runtime; you do not need to install .NET. [
 | Synthetic SQLite dataset | Peak index-process working set | Cached file query median / max |
 | --- | --- | --- |
 | 1 million files, interleaved (with type and age totals) | 187.16 MiB | 1.36 / 12.31 ms |
-| 10 million files, directory-clustered | 192.59 MiB | 5.76 / 86.67 ms |
+| 10 million files, directory-clustered (with type and age totals) | 189.15 MiB | 2.50 / 52.98 ms |
 
-These measure the **index component**, not live filesystem throughput or combined UI/worker memory. Dataset orders differ and are not direct scaling comparisons. The ten-million figures predate the type and age totals. The raw engine was slower on the small warm NTFS fixture. [Hardware, timings, unmet targets, and reproduction commands](docs/performance.md) · [Machine-readable evidence](docs/evidence/)
+These measure the **index component**, not live filesystem throughput or combined UI/worker memory. Dataset orders differ and are not direct scaling comparisons. The raw engine was slower on the small warm NTFS fixture. [Hardware, timings, unmet targets, and reproduction commands](docs/performance.md) · [Machine-readable evidence](docs/evidence/)
 
 ## Build from source
 

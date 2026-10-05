@@ -1,0 +1,18 @@
+{
+  "Kind": "Synthetic SQLite index (not live filesystem throughput)",
+  "Count": 10000000,
+  "IngestionOrder": "Directory-clustered",
+  "IngestSeconds": 244.6257455,
+  "FinalizeSeconds": 1174.8382297,
+  "PeakWorkingSet": 198332416,
+  "QueryMedianMs": 2.4965,
+  "QueryMaximumMs": 52.9805,
+  "MemoryTargetBytes": 1073741824,
+  "MemoryTargetMet": true,
+  "QueryTargetMet": true,
+  "DatabaseBytes": 8390836224,
+  "OS": "Microsoft Windows NT 10.0.26100.0",
+  "CpuCount": 12,
+  "Runtime": "10.0.12",
+  "ElapsedSeconds": 1419.5719403
+}

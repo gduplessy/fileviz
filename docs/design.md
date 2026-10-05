@@ -262,5 +262,5 @@ Status: all eight phases are implemented. The sections below record what was bui
 ### Risks
 
 - `ThemeMode` is marked experimental (`WPF0001`). The suppression is scoped to the app project; revisit it on each .NET release. Fallback: keep the token dictionaries and style controls by hand.
-- Composition totals lengthen snapshot finish time. Measured on the 1M synthetic dataset: finalize 130.79 s against 124.20 s before (+5.3%), with memory and query targets still met. The 10M dataset has not been re-measured. See `performance.md`.
+- Composition totals lengthen snapshot finish time. Measured on the synthetic datasets: finalize +5.3% at one million entries (130.79 s vs 124.20 s) and +1.7% at ten million (1,174.84 s vs 1,155.75 s), with memory and query targets still met. See `performance.md`.
 - The review window prechecks files one at a time; very large selections take proportionally longer before Quarantine is enabled.
