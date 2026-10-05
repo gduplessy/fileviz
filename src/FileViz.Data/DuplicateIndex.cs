@@ -3,8 +3,10 @@ namespace FileViz.Data;
 
 public sealed partial class IndexStore
 {
+    private long collapsedAliases;
     public void PrepareContentWork(long[] snapshots, string[]? roots = null)
     {
+        collapsedAliases = 0;
         Execute("""
         CREATE TABLE IF NOT EXISTS duplicate_work(path TEXT PRIMARY KEY,parent TEXT NOT NULL,name TEXT NOT NULL,identity TEXT,isdir INTEGER NOT NULL,length INTEGER NOT NULL,allocated INTEGER,modified INTEGER NOT NULL,changed INTEGER NOT NULL,attrs INTEGER NOT NULL,source INTEGER NOT NULL,sample TEXT,hash TEXT);
         CREATE INDEX IF NOT EXISTS work_sample ON duplicate_work(length,sample);
@@ -22,6 +24,9 @@ public sealed partial class IndexStore
         WHERE e.snapshot IN({ids}) AND e.isdir=0 AND e.length>0 {rootSql} AND e.snapshot=(SELECT MAX(s.snapshot) FROM entries s WHERE s.path=e.path AND s.snapshot IN({ids}) {rootSql})
         GROUP BY COALESCE(e.identity,e.path);
         """, parameters);
+        // Paths in scope minus physical files staged: hard-link aliases collapsed to one identity.
+        var paths = Convert.ToInt64(Scalar($"SELECT COUNT(*) FROM entries e WHERE e.snapshot IN({ids}) AND e.isdir=0 AND e.length>0 {rootSql} AND e.snapshot=(SELECT MAX(s.snapshot) FROM entries s WHERE s.path=e.path AND s.snapshot IN({ids}) {rootSql});", parameters));
+        collapsedAliases = Math.Max(0, paths - Convert.ToInt64(Scalar("SELECT COUNT(*) FROM duplicate_work;")));
     }
     public IEnumerable<FileEntry> WorkCandidates(bool fullHash)
     {
@@ -46,6 +51,24 @@ public sealed partial class IndexStore
         CASE WHEN ROW_NUMBER() OVER(PARTITION BY length,hash ORDER BY CASE WHEN $pref<>'' AND path LIKE $pref ESCAPE '!' THEN 0 ELSE 1 END,modified DESC,path)=1 THEN 1 ELSE 0 END,source
         FROM duplicate_work WHERE hash IS NOT NULL AND (length,hash) IN(SELECT length,hash FROM duplicate_work WHERE hash IS NOT NULL GROUP BY length,hash HAVING COUNT(*)>1);
         """, ("$s", destination), ("$e", algorithm + " content"), ("$pref", prefix));
+        long Count(string sql) => Convert.ToInt64(Scalar(sql, ("$s", destination)));
+        SaveDuplicateRun(destination, new(algorithm,
+            Count("SELECT COUNT(*) FROM duplicate_work WHERE length IN(SELECT length FROM duplicate_work GROUP BY length HAVING COUNT(*)>1);"),
+            Count("SELECT COUNT(*) FROM duplicate_work WHERE sample IS NOT NULL AND (length,sample) IN(SELECT length,sample FROM duplicate_work WHERE sample IS NOT NULL GROUP BY length,sample HAVING COUNT(*)>1);"),
+            Count("SELECT COUNT(*) FROM duplicates WHERE snapshot=$s;"),
+            Count("SELECT COUNT(DISTINCT groupid) FROM duplicates WHERE snapshot=$s;"),
+            DuplicatePotential(destination),
+            Count("SELECT COUNT(*) FROM duplicate_work WHERE LOWER(name) IN(SELECT LOWER(name) FROM duplicate_work GROUP BY LOWER(name) HAVING COUNT(*)>1);"),
+            collapsedAliases, DateTime.UtcNow.ToString("O")));
+    }
+    private void SaveDuplicateRun(long snapshot, DuplicateRun run) => Execute("INSERT OR REPLACE INTO duplicate_runs VALUES($s,$a,$c,$m,$v,$g,$r,$n,$h,$f);",
+        ("$s", snapshot), ("$a", run.Algorithm), ("$c", run.SizeCandidates), ("$m", run.SampleMatches), ("$v", run.VerifiedFiles), ("$g", run.Groups), ("$r", run.Reclaimable), ("$n", run.NameMatches), ("$h", run.Aliases), ("$f", run.Finished));
+    /// <summary>Counts from the most recent duplicate analysis for the snapshot, or null if none ran.</summary>
+    public DuplicateRun? LastDuplicateRun(long snapshot)
+    {
+        using var command = Command("SELECT algorithm,size_candidates,sample_matches,verified,groups,reclaimable,name_matches,aliases,finished FROM duplicate_runs WHERE snapshot=$s;", ("$s", snapshot));
+        using var reader = command.ExecuteReader();
+        return reader.Read() ? new(reader.GetString(0), reader.GetInt64(1), reader.GetInt64(2), reader.GetInt64(3), reader.GetInt64(4), reader.GetInt64(5), reader.GetInt64(6), reader.GetInt64(7), reader.GetString(8)) : null;
     }
     public long DuplicatePotential(long snapshot) => Convert.ToInt64(Scalar("SELECT COALESCE(SUM(e.length),0) FROM duplicates d JOIN entries e ON e.snapshot=d.source AND e.path=d.path WHERE d.snapshot=$s AND d.keeper=0 AND d.evidence<>'Name candidate';", ("$s", snapshot)));
     public bool IsDirectory(long snapshot, string path) => Convert.ToInt64(Scalar("SELECT COALESCE(isdir,0) FROM entries WHERE snapshot=$s AND path=$p;", ("$s", snapshot), ("$p", path)) ?? 0) != 0;

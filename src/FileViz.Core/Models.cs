@@ -25,6 +25,8 @@ public record Summary(long Files, long Folders, long Logical, long Allocated, lo
 public record Breakdown(string Name, long Bytes, long Count);
 public record ScanProfile(string Name, string[] Roots, string[] Exclusions, bool PreferMft);
 public record DuplicateRow(long GroupId, FileEntry Entry, string Evidence, bool SuggestedKeeper);
+/// <summary>Counts from the last duplicate analysis of a snapshot. Only verified groups carry a savings figure.</summary>
+public record DuplicateRun(string Algorithm, long SizeCandidates, long SampleMatches, long VerifiedFiles, long Groups, long Reclaimable, long NameMatches, long Aliases, string Finished);
 public record HashRequest(FileEntry Entry, string Algorithm, bool Sample = false);
 public record HashResult(string Path, string? Hash, string? Identity, long Length, long ModifiedTicks, long ChangeTicks, string? Error);
 public record WorkerRequest(string Operation, ScanScope[]? Scopes = null, HashRequest[]? Hashes = null, string[]? MetadataPaths = null);

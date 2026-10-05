@@ -5,7 +5,7 @@ using Microsoft.Win32.SafeHandles;
 namespace FileViz.Windows;
 
 public record CleanupSelection(FileEntry Target, FileEntry? Keeper = null);
-public sealed class CleanupService(Action<CleanupRecord> journal)
+public sealed partial class CleanupService(Action<CleanupRecord> journal)
 {
     [StructLayout(LayoutKind.Sequential)]
     private struct IoStatus

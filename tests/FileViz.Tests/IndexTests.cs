@@ -45,6 +45,7 @@ public class IndexTests
         store.FindNameDuplicates(second, [first, second], [data]);
         Assert.Equal(2, store.Duplicates(second).Count);
         Assert.Equal(0, store.DuplicatePotential(second));
+        Assert.Equal(new DuplicateRun("Name", 0, 0, 0, 1, 0, 2, 0, ""), store.LastDuplicateRun(second)! with { Finished = "" });
         store.PrepareContentWork([first, second], [data]);
         var candidates = store.WorkCandidates(false).ToArray();
         Assert.Equal(2, candidates.Length);
@@ -60,6 +61,7 @@ public class IndexTests
         Assert.Equal(2, duplicates.Count);
         Assert.Single(duplicates, x => x.SuggestedKeeper);
         Assert.Equal(3, store.DuplicatePotential(second));
+        Assert.Equal(new DuplicateRun("SHA-256", 2, 2, 2, 1, 3, 2, 0, ""), store.LastDuplicateRun(second)! with { Finished = "" });
     }
     [Fact]
     public async Task CompareAndExportDoNotLoseOrOverwriteData()

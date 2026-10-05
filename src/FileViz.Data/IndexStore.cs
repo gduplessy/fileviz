@@ -35,6 +35,7 @@ public sealed partial class IndexStore : IDisposable
         CREATE TABLE IF NOT EXISTS hashes(path TEXT NOT NULL,algorithm TEXT NOT NULL,sample INTEGER NOT NULL,identity TEXT NOT NULL,length INTEGER NOT NULL,modified INTEGER NOT NULL,changed INTEGER NOT NULL,hash TEXT NOT NULL,PRIMARY KEY(path,algorithm,sample));
         CREATE TABLE IF NOT EXISTS duplicates(snapshot INTEGER NOT NULL REFERENCES snapshots(id) ON DELETE CASCADE,groupid INTEGER NOT NULL,path TEXT NOT NULL,evidence TEXT NOT NULL,keeper INTEGER NOT NULL DEFAULT 0,source INTEGER NOT NULL,PRIMARY KEY(snapshot,path));
         CREATE TABLE IF NOT EXISTS profiles(name TEXT PRIMARY KEY,json TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS duplicate_runs(snapshot INTEGER PRIMARY KEY REFERENCES snapshots(id) ON DELETE CASCADE,algorithm TEXT NOT NULL,size_candidates INTEGER NOT NULL,sample_matches INTEGER NOT NULL,verified INTEGER NOT NULL,groups INTEGER NOT NULL,reclaimable INTEGER NOT NULL,name_matches INTEGER NOT NULL,aliases INTEGER NOT NULL,finished TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS cleanup(id TEXT PRIMARY KEY,original TEXT NOT NULL,destination TEXT NOT NULL,identity TEXT NOT NULL,state TEXT NOT NULL,time TEXT NOT NULL,error TEXT);
 
         """);
@@ -298,6 +299,9 @@ public sealed partial class IndexStore : IDisposable
         CASE WHEN ROW_NUMBER() OVER(PARTITION BY name_key ORDER BY path)=1 THEN 1 ELSE 0 END,snapshot
         FROM physical WHERE name_key IN(SELECT name_key FROM physical GROUP BY name_key HAVING COUNT(*)>1);
         """, parameters.ToArray());
+        var names = Convert.ToInt64(Scalar("SELECT COUNT(*) FROM duplicates WHERE snapshot=$s;", ("$s", destination)));
+        var groups = Convert.ToInt64(Scalar("SELECT COUNT(DISTINCT groupid) FROM duplicates WHERE snapshot=$s;", ("$s", destination)));
+        SaveDuplicateRun(destination, new("Name", 0, 0, 0, groups, 0, names, 0, DateTime.UtcNow.ToString("O")));
     }
     public List<DuplicateRow> Duplicates(long snapshot, int page = 0)
     {
