@@ -107,7 +107,7 @@ public sealed partial class IndexStore : IDisposable
     {
         CreateQueryIndexes(snapshot, progress);
         progress?.Invoke("Calculating folder sizes");
-        RebuildFolders(snapshot);
+        RebuildFolders(snapshot, progress);
         progress?.Invoke("Calculating file types and ages");
         BuildComposition(snapshot);
         progress?.Invoke("Summarizing drive usage");
@@ -189,15 +189,23 @@ public sealed partial class IndexStore : IDisposable
             result.Add(reader.GetString(3));
         return result;
     }
-    private void RebuildFolders(long snapshot)
+    private void RebuildFolders(long snapshot, Action<string>? progress = null)
     {
+        progress?.Invoke("Initializing folder views");
         Execute("DELETE FROM folders WHERE snapshot=$s;", ("$s", snapshot));
-        Execute("""
-        INSERT OR IGNORE INTO folders(snapshot,path,parent,depth,root)
-        SELECT snapshot,path,parent,LENGTH(path)-LENGTH(REPLACE(path,'\','')),root FROM entries WHERE snapshot=$s AND isdir=1;
-        INSERT OR IGNORE INTO folders(snapshot,path,parent,depth,root)
-        SELECT snapshot,root,root,LENGTH(root)-LENGTH(REPLACE(root,'\','')),root FROM entries WHERE snapshot=$s GROUP BY root;
-        """, ("$s", snapshot));
+        var roots = JsonSerializer.Deserialize<string[]>((string)Scalar("SELECT roots FROM snapshots WHERE id=$s;", ("$s", snapshot))!) ?? [];
+        foreach (var root in roots)
+        {
+            // Snapshot roots are already persisted. Do not read and sort the complete
+            // inventory to rediscover them, or visit file rows to select directories.
+            Execute("""INSERT OR IGNORE INTO folders(snapshot,path,parent,depth,root) VALUES($s,$r,$r,LENGTH($r)-LENGTH(REPLACE($r,'\','')),$r);""", ("$s", snapshot), ("$r", root));
+            Execute($"""
+            INSERT OR IGNORE INTO folders(snapshot,path,parent,depth,root)
+            SELECT $s,path,parent,LENGTH(path)-LENGTH(REPLACE(path,'\','')),$r
+            FROM entries INDEXED BY entry_{snapshot}_size WHERE snapshot=$s AND root=$r AND isdir=1;
+            """, ("$s", snapshot), ("$r", root));
+        }
+        progress?.Invoke("Locating hard-link allocation owners");
         // Only shared identities need an allocation owner. Most files are unique; do not
         // perform a second entries lookup for every file or scan entries once per folder.
         Execute($"""
@@ -209,6 +217,9 @@ public sealed partial class IndexStore : IDisposable
         SELECT identity,MIN(path) FROM entries INDEXED BY entry_{snapshot}_identity
         WHERE snapshot=$s AND isdir=0 AND identity IS NOT NULL GROUP BY identity HAVING COUNT(*)>1;
         CREATE TEMP TABLE folder_direct(parent TEXT PRIMARY KEY,logical INTEGER NOT NULL,allocated INTEGER NOT NULL,files INTEGER NOT NULL) WITHOUT ROWID;
+        """, ("$s", snapshot));
+        progress?.Invoke("Summing direct folder files");
+        Execute($"""
         INSERT INTO folder_direct
         SELECT e.parent,SUM(e.length),COALESCE(SUM(CASE WHEN owner.identity IS NULL OR e.path=owner.path THEN e.allocated ELSE 0 END),0),COUNT(*)
         FROM entries e INDEXED BY entry_{snapshot}_parent LEFT JOIN folder_alias_owners owner ON owner.identity=e.identity
@@ -221,6 +232,8 @@ public sealed partial class IndexStore : IDisposable
         """, ("$s", snapshot));
         var maximum = Convert.ToInt32(Scalar("SELECT COALESCE(MAX(depth),0) FROM folders WHERE snapshot=$s;", ("$s", snapshot)));
         for (var depth = maximum; depth >= 0; depth--)
+        {
+            progress?.Invoke($"Rolling up folder depth {maximum - depth + 1} of {maximum + 1}");
             Execute("""
             DELETE FROM folder_rollup;
             INSERT INTO folder_rollup SELECT parent,SUM(logical),SUM(allocated),SUM(files)
@@ -228,6 +241,7 @@ public sealed partial class IndexStore : IDisposable
             UPDATE folders SET (logical,allocated,files)=(SELECT folders.logical+r.logical,folders.allocated+r.allocated,folders.files+r.files FROM folder_rollup r WHERE r.parent=folders.path)
             WHERE snapshot=$s AND path IN(SELECT parent FROM folder_rollup);
             """, ("$s", snapshot), ("$d", depth));
+        }
         Execute("DROP TABLE folder_rollup;");
     }
     public List<Snapshot> Snapshots()
