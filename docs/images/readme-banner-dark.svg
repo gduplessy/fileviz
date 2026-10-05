@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="280" viewBox="0 0 1200 280" role="img" aria-labelledby="title description">
+  <title id="title">FileViz: see where your space goes</title>
+  <desc id="description">Windows disk analysis and duplicate review. A drive and colored treemap represent files of different sizes.</desc>
+  <rect width="1200" height="280" rx="22" fill="#161c26"/>
+  <rect x="32" y="32" width="218" height="216" rx="18" fill="#263447"/>
+  <rect x="51" y="51" width="101" height="112" rx="8" fill="#1f6f8b"/>
+  <rect x="160" y="51" width="71" height="69" rx="8" fill="#2b8a7a"/>
+  <rect x="160" y="128" width="71" height="35" rx="8" fill="#5c69ab"/>
+  <rect x="51" y="171" width="62" height="58" rx="8" fill="#a66b40"/>
+  <rect x="121" y="171" width="110" height="58" rx="8" fill="#755b9c"/>
+  <text x="286" y="105" fill="#e6ebf4" font-family="Segoe UI,Arial,sans-serif" font-size="58" font-weight="700">FileViz</text>
+  <text x="289" y="146" fill="#e6ebf4" font-family="Segoe UI,Arial,sans-serif" font-size="25">See where your space goes.</text>
+  <text x="289" y="183" fill="#a8b7ca" font-family="Segoe UI,Arial,sans-serif" font-size="18">Windows disk analysis. Content duplicates. Reviewed cleanup.</text>
+  <text x="289" y="228" fill="#a8b7ca" font-family="Segoe UI,Arial,sans-serif" font-size="13" font-weight="600" letter-spacing="2">NATIVE DESKTOP  /  LOCAL DATA  /  OPEN SOURCE</text>
+</svg>
