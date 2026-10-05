@@ -7,6 +7,51 @@ namespace FileViz.Tests;
 
 public class CompositionTests
 {
+    [Fact]
+    public void BranchingRollupsPreserveDirectFilesSharedAllocationAndEmptyFolders()
+    {
+        using var fixture = new Fixture();
+        using var store = new IndexStore(Path.Combine(fixture.Root, "branches.db"));
+        var root = fixture.Root;
+        var id = store.CreateSnapshot([root]);
+        var timestamp = DateTime.UtcNow.Ticks;
+        var entries = new List<FileEntry>();
+        for (var i = 0; i < 128; i++)
+        {
+            var branch = Path.Combine(root, $"branch-{i:D3}");
+            var leaf = Path.Combine(branch, "leaf");
+            entries.Add(new(branch, root, Path.GetFileName(branch), $"dir-{i}", true, 0, 0, timestamp, timestamp, 16));
+            entries.Add(new(leaf, branch, "leaf", $"leaf-{i}", true, 0, 0, timestamp, timestamp, 16));
+            entries.Add(new(Path.Combine(branch, "direct.txt"), branch, "direct.txt", null, false, 7, null, timestamp, timestamp, 32));
+            entries.Add(new(Path.Combine(leaf, "shared.mp4"), leaf, "shared.mp4", "shared", false, 3, 8, timestamp, timestamp, 32));
+            entries.Add(new(Path.Combine(leaf, "sparse.zip"), leaf, "sparse.zip", $"sparse-{i}", false, 100, 0, timestamp, timestamp, 32));
+        }
+        var empty = Path.Combine(root, "empty");
+        entries.Add(new(empty, root, "empty", "empty", true, 0, 0, timestamp, timestamp, 16));
+        foreach (var batch in entries.Chunk(256))
+            store.AddBatch(id, new(root, "Fixture", batch, []));
+        for (var run = 0; run < 2; run++)
+        {
+            store.Finish(id, "Complete");
+            Assert.Equal(128 * 110, store.GetSummary(id).Logical);
+            Assert.Equal(8, store.GetSummary(id).Allocated);
+            Assert.Equal(128, store.GetSummary(id).UnknownAllocations);
+            Assert.Equal(128 * 110, store.FolderComposition(id, root)!.Categories.Sum());
+            Assert.Equal(128 * 110, store.FolderComposition(id, root)!.Ages.Sum());
+            for (var i = 0; i < 128; i++)
+            {
+                var branch = Path.Combine(root, $"branch-{i:D3}");
+                Assert.Equal(110, store.FolderComposition(id, branch)!.Categories.Sum());
+                Assert.Equal(110, store.FolderComposition(id, branch)!.Ages.Sum());
+                var files = store.LargestFolders(id, parent: branch);
+                Assert.Equal(103, Assert.Single(files).Bytes);
+                var allocated = store.LargestFolders(id, allocated: true, parent: branch);
+                Assert.Equal(i == 0 ? 8 : 0, Assert.Single(allocated).Bytes);
+            }
+            Assert.Equal(0, store.FolderComposition(id, empty)!.Categories.Sum());
+        }
+    }
+
     [Theory]
     [InlineData(".MP4", FileCategory.Video)]
     [InlineData(".vhdx", FileCategory.DiskImage)]

@@ -47,13 +47,16 @@ public sealed partial class IndexStore
         DROP TABLE temp.direct;
         """, ("$s", snapshot), ("$ref", StartedTicks(snapshot)));
         var rollup = string.Join(",", CompositionColumns.Select(c => $"SUM({c}) {c}"));
-        var add = string.Join(",", CompositionColumns.Select(c => $"folders.{c}+sums.{c}"));
+        var add = string.Join(",", CompositionColumns.Select(c => $"folders.{c}+r.{c}"));
+        Execute($"DROP TABLE IF EXISTS temp.composition_rollup; CREATE TEMP TABLE composition_rollup(parent TEXT PRIMARY KEY,{string.Join(',', CompositionColumns.Select(c => c + " INTEGER NOT NULL"))}) WITHOUT ROWID;");
         var maximum = Convert.ToInt32(Scalar("SELECT COALESCE(MAX(depth),0) FROM folders WHERE snapshot=$s;", ("$s", snapshot)), CultureInfo.InvariantCulture);
         for (var depth = maximum; depth >= 0; depth--)
             Execute($"""
-            WITH sums AS (SELECT parent,{rollup} FROM folders WHERE snapshot=$s AND depth=$d AND path<>parent GROUP BY parent)
-            UPDATE folders SET ({CompositionList})=(SELECT {add} FROM sums WHERE sums.parent=folders.path) WHERE snapshot=$s AND path IN (SELECT parent FROM sums);
+            DELETE FROM composition_rollup;
+            INSERT INTO composition_rollup SELECT parent,{rollup} FROM folders WHERE snapshot=$s AND depth=$d AND path<>parent GROUP BY parent;
+            UPDATE folders SET ({CompositionList})=(SELECT {add} FROM composition_rollup r WHERE r.parent=folders.path) WHERE snapshot=$s AND path IN (SELECT parent FROM composition_rollup);
             """, ("$s", snapshot), ("$d", depth));
+        Execute("DROP TABLE composition_rollup;");
         Execute("UPDATE snapshots SET composition=1 WHERE id=$s;", ("$s", snapshot));
     }
     /// <summary>Category and age totals for a folder, or null when the snapshot predates composition or the folder is unknown.</summary>

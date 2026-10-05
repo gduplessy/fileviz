@@ -165,17 +165,38 @@ public sealed partial class IndexStore : IDisposable
         SELECT snapshot,path,parent,LENGTH(path)-LENGTH(REPLACE(path,'\','')),root FROM entries WHERE snapshot=$s AND isdir=1;
         INSERT OR IGNORE INTO folders(snapshot,path,parent,depth,root)
         SELECT snapshot,root,root,LENGTH(root)-LENGTH(REPLACE(root,'\','')),root FROM entries WHERE snapshot=$s GROUP BY root;
-        UPDATE folders SET logical=COALESCE((SELECT SUM(length) FROM entries WHERE snapshot=$s AND isdir=0 AND parent=folders.path),0),
-        files=(SELECT COUNT(*) FROM entries WHERE snapshot=$s AND isdir=0 AND parent=folders.path),
-        allocated=COALESCE((SELECT SUM(allocated) FROM entries e WHERE snapshot=$s AND isdir=0 AND parent=folders.path AND (identity IS NULL OR path=(SELECT MIN(path) FROM entries a WHERE a.snapshot=$s AND a.identity=e.identity))),0)
-        WHERE snapshot=$s;
+        """, ("$s", snapshot));
+        // Only shared identities need an allocation owner. Most files are unique; do not
+        // perform a second entries lookup for every file or scan entries once per folder.
+        Execute($"""
+        DROP TABLE IF EXISTS temp.folder_alias_owners;
+        DROP TABLE IF EXISTS temp.folder_direct;
+        DROP TABLE IF EXISTS temp.folder_rollup;
+        CREATE TEMP TABLE folder_alias_owners(identity TEXT PRIMARY KEY,path TEXT NOT NULL) WITHOUT ROWID;
+        INSERT INTO folder_alias_owners
+        SELECT identity,MIN(path) FROM entries INDEXED BY entry_{snapshot}_identity
+        WHERE snapshot=$s AND isdir=0 AND identity IS NOT NULL GROUP BY identity HAVING COUNT(*)>1;
+        CREATE TEMP TABLE folder_direct(parent TEXT PRIMARY KEY,logical INTEGER NOT NULL,allocated INTEGER NOT NULL,files INTEGER NOT NULL) WITHOUT ROWID;
+        INSERT INTO folder_direct
+        SELECT e.parent,SUM(e.length),COALESCE(SUM(CASE WHEN owner.identity IS NULL OR e.path=owner.path THEN e.allocated ELSE 0 END),0),COUNT(*)
+        FROM entries e INDEXED BY entry_{snapshot}_parent LEFT JOIN folder_alias_owners owner ON owner.identity=e.identity
+        WHERE e.snapshot=$s AND e.isdir=0 GROUP BY e.parent;
+        UPDATE folders SET (logical,allocated,files)=(SELECT logical,allocated,files FROM folder_direct WHERE folder_direct.parent=folders.path)
+        WHERE snapshot=$s AND path IN(SELECT parent FROM folder_direct);
+        DROP TABLE folder_direct;
+        DROP TABLE folder_alias_owners;
+        CREATE TEMP TABLE folder_rollup(parent TEXT PRIMARY KEY,logical INTEGER NOT NULL,allocated INTEGER NOT NULL,files INTEGER NOT NULL) WITHOUT ROWID;
         """, ("$s", snapshot));
         var maximum = Convert.ToInt32(Scalar("SELECT COALESCE(MAX(depth),0) FROM folders WHERE snapshot=$s;", ("$s", snapshot)));
         for (var depth = maximum; depth >= 0; depth--)
             Execute("""
-            WITH sums AS (SELECT parent,SUM(logical) l,SUM(allocated) a,SUM(files) f FROM folders WHERE snapshot=$s AND depth=$d AND path<>parent GROUP BY parent)
-            UPDATE folders SET logical=logical+COALESCE((SELECT l FROM sums WHERE parent=folders.path),0),allocated=allocated+COALESCE((SELECT a FROM sums WHERE parent=folders.path),0),files=files+COALESCE((SELECT f FROM sums WHERE parent=folders.path),0) WHERE snapshot=$s AND path IN(SELECT parent FROM sums);
+            DELETE FROM folder_rollup;
+            INSERT INTO folder_rollup SELECT parent,SUM(logical),SUM(allocated),SUM(files)
+            FROM folders WHERE snapshot=$s AND depth=$d AND path<>parent GROUP BY parent;
+            UPDATE folders SET (logical,allocated,files)=(SELECT folders.logical+r.logical,folders.allocated+r.allocated,folders.files+r.files FROM folder_rollup r WHERE r.parent=folders.path)
+            WHERE snapshot=$s AND path IN(SELECT parent FROM folder_rollup);
             """, ("$s", snapshot), ("$d", depth));
+        Execute("DROP TABLE folder_rollup;");
     }
     public List<Snapshot> Snapshots()
     {

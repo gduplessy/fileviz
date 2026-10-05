@@ -5,9 +5,9 @@ using FileViz.Data;
 using FileViz.Windows;
 using FileViz.Windows.Ntfs;
 
-if (args.Length < 3 || args[0] is not ("--index" or "--scan" or "--parity" or "--aliases"))
+if (args.Length < 3 || args[0] is not ("--index" or "--scan" or "--parity" or "--aliases" or "--tree"))
 {
-    Console.Error.WriteLine("Usage: --index COUNT OUTPUT | --scan ROOT OUTPUT [mft|directory] | --parity ROOT OUTPUT | --aliases GROUPS OUTPUT [--unbatched]");
+    Console.Error.WriteLine("Usage: --index COUNT OUTPUT | --scan ROOT OUTPUT [mft|directory] | --parity ROOT OUTPUT | --aliases GROUPS OUTPUT [--unbatched] | --tree BRANCHES OUTPUT");
     return 2;
 }
 var output = Path.GetFullPath(args[2]);
@@ -19,7 +19,9 @@ using var sample = new Timer(_ => { try { process.Refresh(); Interlocked.Exchang
 object result;
 try
 {
-    if (args[0] == "--aliases")
+    if (args[0] == "--tree")
+        result = TreeBenchmark.Run(int.Parse(args[1]), output);
+    else if (args[0] == "--aliases")
         result = AliasBenchmark.Run(int.Parse(args[1]), output, args.Contains("--unbatched"));
     else if (args[0] == "--index")
     {
