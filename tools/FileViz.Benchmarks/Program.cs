@@ -5,9 +5,9 @@ using FileViz.Data;
 using FileViz.Windows;
 using FileViz.Windows.Ntfs;
 
-if (args.Length < 3 || args[0] is not ("--index" or "--scan" or "--parity"))
+if (args.Length < 3 || args[0] is not ("--index" or "--scan" or "--parity" or "--aliases"))
 {
-    Console.Error.WriteLine("Usage: --index COUNT OUTPUT | --scan ROOT OUTPUT [mft|directory] | --parity ROOT OUTPUT");
+    Console.Error.WriteLine("Usage: --index COUNT OUTPUT | --scan ROOT OUTPUT [mft|directory] | --parity ROOT OUTPUT | --aliases GROUPS OUTPUT [--unbatched]");
     return 2;
 }
 var output = Path.GetFullPath(args[2]);
@@ -19,7 +19,9 @@ using var sample = new Timer(_ => { try { process.Refresh(); Interlocked.Exchang
 object result;
 try
 {
-    if (args[0] == "--index")
+    if (args[0] == "--aliases")
+        result = AliasBenchmark.Run(int.Parse(args[1]), output, args.Contains("--unbatched"));
+    else if (args[0] == "--index")
     {
         var clustered = args.Contains("--clustered");
         var count = int.Parse(args[1]);

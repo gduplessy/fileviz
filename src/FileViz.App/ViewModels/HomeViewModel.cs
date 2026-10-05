@@ -283,14 +283,21 @@ public sealed class HomeViewModel : Bindable, ISnapshotSection
                 {
                     if (aliases.Count == 0)
                         return;
+                    await session.WaitIfPausedAsync(token);
+                    var refreshed = new List<FileEntry>(aliases.Count);
+                    var errors = new List<ScanError>(aliases.Count);
                     await worker.ExecuteAsync(new("metadata", MetadataPaths: aliases.ToArray()), message =>
                     {
-                        if (message.Entry is { } entry && !writer.RefreshAlias(snapshot, entry))
-                            writer.AddError(snapshot, entry.Path, "Hard-link identity changed during metadata refresh.");
+                        if (message.Entry is { } entry)
+                            refreshed.Add(entry);
                         if (message.Kind == "metadata-error")
-                            writer.AddError(snapshot, message.Path ?? "", message.Text ?? "Hard-link metadata refresh failed.");
+                            errors.Add(new(message.Path ?? "", message.Text ?? "Hard-link metadata refresh failed."));
                         return Task.CompletedTask;
                     }, token);
+                    foreach (var entry in writer.RefreshAliases(snapshot, refreshed, token))
+                        errors.Add(new(entry.Path, "Hard-link identity changed during metadata refresh."));
+                    if (errors.Count > 0)
+                        writer.AddBatch(snapshot, new("", "Hard-link metadata", [], errors.ToArray()));
                     aliases.Clear();
                     aliasBytes = 0;
                 }

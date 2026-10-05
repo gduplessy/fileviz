@@ -2,6 +2,7 @@ using System.Text.Json;
 using FileViz.Core;
 using FileViz.Data;
 using FileViz.Windows;
+using Microsoft.Data.Sqlite;
 using Xunit;
 namespace FileViz.Tests;
 
@@ -140,5 +141,58 @@ public class IndexTests
         Assert.Equal("valid", Assert.Single(store.Query(id, new())).Name);
         Assert.Single(store.Errors(id));
         Assert.Equal("Partial", Assert.Single(store.Snapshots()).State);
+    }
+
+    [Fact]
+    public void UnchangedAliasRefreshDoesNotWriteAndUnknownAllocationRemainsUnknown()
+    {
+        using var fixture = new Fixture();
+        var db = Path.Combine(fixture.Root, "no-op.db");
+        using var store = new IndexStore(db);
+        var id = store.CreateSnapshot([fixture.Root]);
+        var a = new FileEntry(Path.Combine(fixture.Root, "a"), fixture.Root, "a", "id", false, 3, null, 100, 100, 32);
+        var b = a with { Path = Path.Combine(fixture.Root, "b"), Name = "b" };
+        store.AddBatch(id, new(fixture.Root, "Fixture", [a, b], []));
+        Assert.Single(store.AliasPaths(id));
+        using var audit = new SqliteConnection($"Data Source={db};Pooling=False");
+        audit.Open();
+        using var command = audit.CreateCommand();
+        command.CommandText = "CREATE TABLE writes(n INTEGER); INSERT INTO writes VALUES(0); CREATE TRIGGER audit_updates AFTER UPDATE ON entries BEGIN UPDATE writes SET n=n+1; END;";
+        command.ExecuteNonQuery();
+        Assert.Empty(store.RefreshAliases(id, [a]));
+        command.CommandText = "SELECT n FROM writes;";
+        Assert.Equal(0L, command.ExecuteScalar());
+        Assert.Empty(store.RefreshAliases(id, [a with { Length = 7, Allocated = 8 }]));
+        Assert.Equal(2L, command.ExecuteScalar());
+        Assert.Empty(store.RefreshAliases(id, [a with { Length = 7 }]));
+        Assert.Equal(4L, command.ExecuteScalar());
+        Assert.All(store.Query(id, new()), entry => { Assert.Equal(7, entry.Length); Assert.Null(entry.Allocated); });
+        Assert.Single(store.RefreshAliases(id, [a with { Identity = "replaced" }]));
+        Assert.Equal(4L, command.ExecuteScalar());
+    }
+
+    [Fact]
+    public void AliasBatchRollsBackOnFailureAndRejectsUnboundedOrCancelledWork()
+    {
+        using var fixture = new Fixture();
+        var db = Path.Combine(fixture.Root, "atomic.db");
+        using var store = new IndexStore(db);
+        var id = store.CreateSnapshot([fixture.Root]);
+        var a = new FileEntry(Path.Combine(fixture.Root, "a"), fixture.Root, "a", "id", false, 3, 8, 100, 100, 32);
+        var b = a with { Path = Path.Combine(fixture.Root, "b"), Name = "b" };
+        store.AddBatch(id, new(fixture.Root, "Fixture", [a, b], []));
+        Assert.Single(store.AliasPaths(id));
+        using var audit = new SqliteConnection($"Data Source={db};Pooling=False");
+        audit.Open();
+        using var command = audit.CreateCommand();
+        command.CommandText = "CREATE TRIGGER reject_test_update BEFORE UPDATE ON entries WHEN NEW.length=99 BEGIN SELECT RAISE(ABORT,'test failure'); END;";
+        command.ExecuteNonQuery();
+        Assert.Throws<SqliteException>(() => store.RefreshAliases(id, [a with { Length = 7 }, b with { Length = 99 }]));
+        Assert.All(store.Query(id, new()), entry => Assert.Equal(3, entry.Length));
+        Assert.Throws<ArgumentOutOfRangeException>(() => store.RefreshAliases(id, Enumerable.Repeat(a, 65).ToArray()));
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        Assert.Throws<OperationCanceledException>(() => store.RefreshAliases(id, [a with { Length = 7 }], cancellation.Token));
+        Assert.All(store.Query(id, new()), entry => Assert.Equal(3, entry.Length));
     }
 }
