@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 — preview
 
 - Windows 11 Fluent theme with Mica, the Windows accent color, and system, light, or dark mode chosen in Settings.
 - New window layout: title bar search (Ctrl+F), left navigation (Home, Explorer, Duplicates, Compare, Cleanup, Diagnostics, Settings; Ctrl+1 to Ctrl+6, F6 to move between panes), and a status bar. Folders and File types are now a switch inside Explorer.

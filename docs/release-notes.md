@@ -26,4 +26,6 @@ Packages are unsigned; Windows SmartScreen may prompt. Cleanup requires explicit
 
 ## Verification
 
-VERIFICATION
+- Release build: zero warnings and errors; all 44 tests passed, including composition totals, the space-map layout, cleanup precheck agreement with the move, compare totals, diagnostic kinds, and legacy database migration.
+- Visible desktop smoke in light and dark themes: 303 disposable fixture files, expected duplicate pair, zero diagnostics, populated space map. Every section, the review window, and a two-snapshot comparison were captured and reviewed.
+- Synthetic index benchmarks with type and age totals: finalize +5.3% at one million entries and +1.7% at ten million, memory and query targets met.
