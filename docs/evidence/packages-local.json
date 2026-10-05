@@ -1,0 +1,30 @@
+{
+  "Portable": {
+    "Status": "Duplicate analysis complete. Cleanup performs fresh byte and stream verification.",
+    "SummaryText": "303 files · 39.5 MiB logical · 39.5 MiB reported allocation",
+    "Rows": 250,
+    "DuplicateRows": 2,
+    "PeakWorkingSet": 179404800,
+    "Snapshots": 1,
+    "Errors": 0,
+    "RenderedVisibleWindow": true
+  },
+  "Installed": {
+    "Status": "Duplicate analysis complete. Cleanup performs fresh byte and stream verification.",
+    "SummaryText": "303 files · 39.5 MiB logical · 39.5 MiB reported allocation",
+    "Rows": 250,
+    "DuplicateRows": 2,
+    "PeakWorkingSet": 180015104,
+    "Snapshots": 1,
+    "Errors": 0,
+    "RenderedVisibleWindow": true
+  },
+  "InstallerExitCode": 0,
+  "UninstallerExitCode": 0,
+  "ChecksumsVerified": true,
+  "DeveloperRuntimeRemovedFromEnvironment": true,
+  "OS": "Microsoft Windows NT 10.0.26100.0",
+  "ValidatedUtc": "2026-10-05T00:53:14.495975Z",
+  "SourceCommit": "4852563",
+  "Limitation": "This pre-release package run preceded the final root/treemap binding fix; final release assets are validated separately."
+}

@@ -4,7 +4,7 @@
 2. Run the visible desktop fixture smoke test and disposable NTFS parity tooling.
 3. Run the index benchmarks; record hardware, results, and unmet targets in `performance.md`.
 4. Update the changelog and preview limitations. Review package licenses and notices.
-5. Run `scripts/build-release.ps1` into an empty output directory. Verify the ZIP and per-user installer with no developer runtime in PATH.
+5. Run `scripts/build-release.ps1` into an empty output directory. Run `scripts/validate-package.ps1` to verify checksums, extracted ZIP, per-user install, duplicate smoke, and uninstall with SDK paths removed. It refuses an existing user installation.
 6. Commit the version and evidence; tag `vVERSION`. The package workflow attaches versioned packages and checksums to a preview GitHub release.
 
 The GPL license and upstream license texts ship with both package formats. The `worker` directory is required. Installer upgrades preserve local snapshots under `%LOCALAPPDATA%/FileViz`; uninstall removes application binaries, not analysis history or quarantined files.
