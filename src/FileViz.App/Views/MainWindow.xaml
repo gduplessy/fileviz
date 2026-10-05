@@ -79,7 +79,7 @@
    <Grid.ColumnDefinitions><ColumnDefinition Width="232"/><ColumnDefinition/></Grid.ColumnDefinitions>
 
    <!-- Navigation -->
-   <DockPanel Margin="8,4,8,8">
+   <DockPanel x:Name="NavPane" Margin="8,4,8,8">
     <ContentControl DockPanel.Dock="Bottom" Content="{Binding SettingsNav}" ContentTemplate="{StaticResource NavTemplate}" Focusable="False"/>
     <ItemsControl ItemsSource="{Binding NavItems}" ItemTemplate="{StaticResource NavTemplate}" Focusable="False" AutomationProperties.Name="Sections"/>
    </DockPanel>
@@ -88,7 +88,7 @@
    <Border Grid.Column="1" Background="{DynamicResource LayerFillColorDefaultBrush}" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1,1,0,0" CornerRadius="8,0,0,0">
     <Grid>
      <Grid.RowDefinitions><RowDefinition/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-     <ContentControl Content="{Binding SelectedNav.Content}" Focusable="False"/>
+     <ContentControl x:Name="ContentHost" Content="{Binding SelectedNav.Content}" Focusable="False"/>
      <Border Grid.Row="1" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" Padding="16,6">
       <DockPanel>
        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
