@@ -1,0 +1,47 @@
+name: Package release
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  package:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - run: dotnet restore FileViz.slnx --locked-mode
+      - run: dotnet test FileViz.slnx -c Release --no-restore
+      - name: Install pinned Inno Setup
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force .tools | Out-Null
+          Invoke-WebRequest https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe -OutFile .tools/inno-setup.exe
+          $signature = Get-AuthenticodeSignature .tools/inno-setup.exe
+          if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notlike '*Pyrsys*') { throw 'Unexpected installer signature.' }
+          Start-Process .tools/inno-setup.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/CURRENTUSER','/DIR=C:\fileviz-inno','/NOICONS' -WindowStyle Hidden -Wait
+      - name: Build ZIP, installer and checksums
+        shell: pwsh
+        run: |
+          $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.TrimStart('v') } else { '0.1.0-dev' }
+          ./scripts/build-release.ps1 -Version $version -Iscc C:/fileviz-inno/ISCC.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fileviz-win-x64
+          path: |
+            artifacts/release/*.zip
+            artifacts/release/*.exe
+            artifacts/release/SHA256SUMS.txt
+      - name: Attach versioned packages
+        if: github.ref_type == 'tag'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view $env:GITHUB_REF_NAME
+          if ($LASTEXITCODE -ne 0) { gh release create $env:GITHUB_REF_NAME --title "FileViz $env:GITHUB_REF_NAME" --prerelease --notes-file docs/release-notes.md }
+          $assets=Get-ChildItem artifacts/release -File|Where-Object { $_.Extension -in '.zip','.exe' -or $_.Name -eq 'SHA256SUMS.txt' }|ForEach-Object FullName
+          gh release upload $env:GITHUB_REF_NAME @assets --clobber
