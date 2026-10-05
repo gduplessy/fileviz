@@ -68,7 +68,7 @@ public sealed partial class IndexStore : IDisposable
             command.ExecuteNonQuery();
         }
         foreach (var error in batch.Errors)
-            Execute("INSERT INTO errors VALUES($s,$p,$m);", ("$s", snapshot), ("$p", error.Path), ("$m", error.Message));
+            Execute("INSERT INTO errors(snapshot,path,message,kind) VALUES($s,$p,$m,$k);", ("$s", snapshot), ("$p", error.Path), ("$m", error.Message), ("$k", error.Kind));
         transaction.Commit();
     }
     public void Finish(long snapshot, string state)
@@ -248,11 +248,11 @@ public sealed partial class IndexStore : IDisposable
     }
     public List<ScanError> Errors(long snapshot)
     {
-        using var command = Command("SELECT path,message FROM errors WHERE snapshot=$s LIMIT 1000;", ("$s", snapshot));
+        using var command = Command("SELECT path,message,kind FROM errors WHERE snapshot=$s LIMIT 1000;", ("$s", snapshot));
         using var reader = command.ExecuteReader();
         var result = new List<ScanError>();
         while (reader.Read())
-            result.Add(new(reader.GetString(0), reader.GetString(1)));
+            result.Add(new(reader.GetString(0), reader.GetString(1), DiagnosticKinds.Classify(reader.IsDBNull(2) ? null : reader.GetString(2), reader.GetString(1))));
         return result;
     }
     public IEnumerable<FileEntry> ContentCandidates(long[] snapshots, long minimum = 1)
@@ -321,18 +321,59 @@ public sealed partial class IndexStore : IDisposable
             result.Add(Entry(reader));
         return result;
     }
-    public List<Difference> Compare(long before, long after, int page = 0)
+    /// <summary>First 250 added, removed, or grown files by size change, optionally only one kind of change.</summary>
+    public List<Difference> Compare(long before, long after, int page = 0, string? change = null)
     {
         using var command = Command("""
-        SELECT a.path,CASE WHEN b.path IS NULL THEN 'Added' ELSE 'Grown' END,COALESCE(b.length,0),a.length FROM entries a LEFT JOIN entries b ON b.snapshot=$before AND b.path=a.path WHERE a.snapshot=$after AND a.isdir=0 AND (b.path IS NULL OR a.length>b.length)
-        UNION ALL SELECT b.path,'Removed',b.length,0 FROM entries b LEFT JOIN entries a ON a.snapshot=$after AND a.path=b.path WHERE b.snapshot=$before AND b.isdir=0 AND a.path IS NULL ORDER BY 4 DESC LIMIT 250 OFFSET $offset;
-        """, ("$before", before), ("$after", after), ("$offset", Math.Max(0, page) * 250));
+        SELECT * FROM (
+        SELECT a.path p,CASE WHEN b.path IS NULL THEN 'Added' ELSE 'Grown' END c,COALESCE(b.length,0) x,a.length y FROM entries a LEFT JOIN entries b ON b.snapshot=$before AND b.path=a.path WHERE a.snapshot=$after AND a.isdir=0 AND (b.path IS NULL OR a.length>b.length)
+        UNION ALL SELECT b.path,'Removed',b.length,0 FROM entries b LEFT JOIN entries a ON a.snapshot=$after AND a.path=b.path WHERE b.snapshot=$before AND b.isdir=0 AND a.path IS NULL)
+        WHERE $change IS NULL OR c=$change ORDER BY ABS(y-x) DESC,p LIMIT 250 OFFSET $offset;
+        """, ("$before", before), ("$after", after), ("$offset", Math.Max(0, page) * 250), ("$change", change));
         using var reader = command.ExecuteReader();
         var result = new List<Difference>();
         while (reader.Read())
             result.Add(new(reader.GetString(0), reader.GetString(1), reader.GetInt64(2), reader.GetInt64(3)));
         return result;
     }
+    /// <summary>Counts and bytes of every change between two snapshots, not just the first page.</summary>
+    public CompareSummary CompareTotals(long before, long after)
+    {
+        using var command = Command("""
+        SELECT (SELECT COUNT(*) FROM entries a LEFT JOIN entries b ON b.snapshot=$b AND b.path=a.path WHERE a.snapshot=$a AND a.isdir=0 AND b.path IS NULL),
+        (SELECT COALESCE(SUM(a.length),0) FROM entries a LEFT JOIN entries b ON b.snapshot=$b AND b.path=a.path WHERE a.snapshot=$a AND a.isdir=0 AND b.path IS NULL),
+        (SELECT COUNT(*) FROM entries b LEFT JOIN entries a ON a.snapshot=$a AND a.path=b.path WHERE b.snapshot=$b AND b.isdir=0 AND a.path IS NULL),
+        (SELECT COALESCE(SUM(b.length),0) FROM entries b LEFT JOIN entries a ON a.snapshot=$a AND a.path=b.path WHERE b.snapshot=$b AND b.isdir=0 AND a.path IS NULL),
+        COALESCE(SUM(CASE WHEN a.length>b.length THEN 1 ELSE 0 END),0),COALESCE(SUM(CASE WHEN a.length>b.length THEN a.length-b.length ELSE 0 END),0),
+        COALESCE(SUM(CASE WHEN a.length<b.length THEN 1 ELSE 0 END),0),COALESCE(SUM(CASE WHEN a.length<b.length THEN b.length-a.length ELSE 0 END),0)
+        FROM entries a JOIN entries b ON b.snapshot=$b AND b.path=a.path WHERE a.snapshot=$a AND a.isdir=0 AND b.isdir=0;
+        """, ("$a", after), ("$b", before));
+        using var reader = command.ExecuteReader();
+        reader.Read();
+        return new(reader.GetInt64(0), reader.GetInt64(1), reader.GetInt64(2), reader.GetInt64(3), reader.GetInt64(4), reader.GetInt64(5), reader.GetInt64(6), reader.GetInt64(7));
+    }
+    /// <summary>
+    /// Folders one and two levels below <paramref name="root"/> whose logical size changed most, from the materialized
+    /// folder totals of both snapshots (no file-level join).
+    /// </summary>
+    public List<FolderChange> FolderChanges(long before, long after, string root, int limit = 12)
+    {
+        var normalized = Paths.Normalize(root);
+        var depth = Convert.ToInt64(Scalar("SELECT depth FROM folders WHERE snapshot=$a AND path=$r;", ("$a", after), ("$r", normalized)) ?? Scalar("SELECT depth FROM folders WHERE snapshot=$b AND path=$r;", ("$b", before), ("$r", normalized)) ?? 0L);
+        using var command = Command("""
+        SELECT * FROM (
+        SELECT a.path p,COALESCE(b.logical,0) x,a.logical y FROM folders a LEFT JOIN folders b ON b.snapshot=$b AND b.path=a.path WHERE a.snapshot=$a AND a.root=$r AND a.depth BETWEEN $d+1 AND $d+2
+        UNION ALL SELECT b.path,b.logical,0 FROM folders b LEFT JOIN folders a ON a.snapshot=$a AND a.path=b.path WHERE b.snapshot=$b AND b.root=$r AND b.depth BETWEEN $d+1 AND $d+2 AND a.path IS NULL)
+        WHERE x<>y ORDER BY ABS(y-x) DESC,p LIMIT $n;
+        """, ("$a", after), ("$b", before), ("$r", normalized), ("$d", depth), ("$n", limit));
+        using var reader = command.ExecuteReader();
+        var result = new List<FolderChange>();
+        while (reader.Read())
+            result.Add(new(reader.GetString(0), reader.GetInt64(1), reader.GetInt64(2)));
+        return result;
+    }
+    public string? Setting(string key) => Scalar("SELECT value FROM settings WHERE key=$k;", ("$k", key)) as string;
+    public void SaveSetting(string key, string value) => Execute("INSERT OR REPLACE INTO settings(key,value) VALUES($k,$v);", ("$k", key), ("$v", value));
     public void SaveProfile(ScanProfile profile) => Execute("INSERT OR REPLACE INTO profiles VALUES($name,$json);", ("$name", profile.Name), ("$json", JsonSerializer.Serialize(profile)));
     public List<ScanProfile> Profiles()
     {

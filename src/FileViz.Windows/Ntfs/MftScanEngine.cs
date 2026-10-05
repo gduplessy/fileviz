@@ -345,7 +345,7 @@ public sealed class AutoScanEngine : IScanEngine
             }
         }
         if (failure != null)
-            yield return new(scope.Root, "Directory fallback", [], [new(scope.Root, failure)], true);
+            yield return new(scope.Root, "Directory fallback", [], [new(scope.Root, failure, DiagnosticKinds.EngineFallback)], true);
         await foreach (var batch in new DirectoryScanEngine().ScanAsync(scope, cancellationToken))
             yield return batch;
     }

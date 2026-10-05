@@ -33,7 +33,7 @@ public sealed class DirectoryScanEngine : IScanEngine
                     if (!ended)
                         entry = frame.Iterator.Current;
                 }
-                catch (Exception e) when (e is Win32Exception or IOException or UnauthorizedAccessException) { errors.Add(new(frame.Directory, e.Message)); ended = true; }
+                catch (Exception e) when (e is Win32Exception or IOException or UnauthorizedAccessException) { errors.Add(new(frame.Directory, e.Message, DiagnosticKinds.FromException(e))); ended = true; }
                 if (ended)
                 {
                     stack.Pop().Iterator.Dispose();
@@ -45,7 +45,7 @@ public sealed class DirectoryScanEngine : IScanEngine
                     if (entry.IsDirectory && !entry.IsReparse && !entry.IsPlaceholder)
                     {
                         if (stack.Count >= 512)
-                            errors.Add(new(entry.Path, "Directory depth exceeds the handle budget."));
+                            errors.Add(new(entry.Path, "Directory depth exceeds the handle budget.", DiagnosticKinds.NotTraversed));
                         else
                             stack.Push((entry.Path, Enumerate(entry.Path, volume).GetEnumerator()));
                     }

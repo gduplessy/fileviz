@@ -16,6 +16,9 @@ public sealed partial class IndexStore
                 Execute($"ALTER TABLE folders ADD COLUMN {column} INTEGER NOT NULL DEFAULT 0;");
         if (!Columns("snapshots").Contains("composition"))
             Execute("ALTER TABLE snapshots ADD COLUMN composition INTEGER NOT NULL DEFAULT 0;");
+        if (!Columns("errors").Contains("kind"))
+            Execute("ALTER TABLE errors ADD COLUMN kind TEXT;");
+        Execute("CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY,value TEXT NOT NULL);");
     }
     private HashSet<string> Columns(string table)
     {

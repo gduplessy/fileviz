@@ -16,7 +16,7 @@ public record FileEntry(string Path, string Parent, string Name, string? Identit
     public string AllocatedText => Allocated is long size ? Format.Bytes(size) : "Unknown";
     public string ModifiedText => ModifiedTicks > 0 ? new DateTime(ModifiedTicks, DateTimeKind.Utc).ToLocalTime().ToString("g", CultureInfo.CurrentCulture) : "Unknown";
 }
-public record ScanError(string Path, string Message);
+public record ScanError(string Path, string Message, string? Kind = null);
 /// <summary>Work done and total for engines that know their extent (raw MFT records). Absent for directory enumeration.</summary>
 public record ScanProgress(long Done, long Total);
 public record ScanBatch(string Root, string Engine, FileEntry[] Entries, ScanError[] Errors, bool Restart = false, ScanProgress? Progress = null);

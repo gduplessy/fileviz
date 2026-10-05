@@ -84,5 +84,5 @@ public sealed partial class IndexStore
             result.Add(reader.GetString(0));
         return result;
     }
-    public void AddError(long snapshot, string path, string message) => Execute("INSERT INTO errors VALUES($s,$p,$m);", ("$s", snapshot), ("$p", path), ("$m", message));
+    public void AddError(long snapshot, string path, string message, string? kind = null) => Execute("INSERT INTO errors(snapshot,path,message,kind) VALUES($s,$p,$m,$k);", ("$s", snapshot), ("$p", path), ("$m", message), ("$k", kind));
 }
