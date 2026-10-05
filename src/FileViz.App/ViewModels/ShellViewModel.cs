@@ -460,7 +460,7 @@ public sealed class ShellViewModel : Bindable, IDisposable
         if (active == 0)
             return;
         Replace(Duplicates, store.Duplicates(active, duplicatePage));
-        DuplicateText = $"Main-stream content candidates · {Format.Bytes(store.DuplicatePotential(active))} potential savings before stream/byte verification; shared extents and named streams can change savings. Suggested keepers are not automatic selections.";
+        DuplicateText = $"Main-stream content candidates · {Format.Bytes(store.DuplicatePotential(active))} potential duplicate logical bytes; allocation and named streams require fresh verification. Suggested keepers are not automatic selections.";
     }
     private async Task CompareAsync()
     {
@@ -518,9 +518,12 @@ public sealed class ShellViewModel : Bindable, IDisposable
     private void ReloadHistory()
     {
         var id = active;
+        var comparisonId = CompareBefore?.Value.Id;
         Replace(History, store.Snapshots().Select(x => new SnapshotRow(x)));
-        if (CompareBefore == null)
-            CompareBefore = History.Skip(1).FirstOrDefault();
+        selectedSnapshot = History.FirstOrDefault(x => x.Value.Id == id);
+        Changed(nameof(SelectedSnapshot));
+        CompareBefore = History.FirstOrDefault(x => x.Value.Id == comparisonId) ?? History.Skip(1).FirstOrDefault();
+        Changed(nameof(CompareBefore));
         var choices = History.SelectMany(x => (JsonSerializer.Deserialize<string[]>(x.Value.Roots) ?? []).Select(root => new { x.Value.Id, Root = root })).GroupBy(x => x.Root, StringComparer.OrdinalIgnoreCase).Select(x => x.OrderByDescending(y => y.Id).First()).ToArray();
         var selectedRoots = DuplicateRoots.Where(x => x.Selected).Select(x => x.Root).ToHashSet(StringComparer.OrdinalIgnoreCase);
         Replace(DuplicateRoots, choices.Select(x => new DuplicateScopeRow(x.Id, x.Root, selectedRoots.Contains(x.Root) || x.Root == currentRoot)));
