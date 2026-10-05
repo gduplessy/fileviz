@@ -1,12 +1,12 @@
 <UserControl x:Class="FileViz.App.Views.Sections.ExplorerView" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:views="clr-namespace:FileViz.App.Views">
  <Grid Margin="{StaticResource PagePadding}">
-  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="200"/><RowDefinition/></Grid.RowDefinitions>
+  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition/></Grid.RowDefinitions>
 
-  <!-- Header: location, snapshot, actions -->
+  <!-- Header: breadcrumb, snapshot, actions -->
   <DockPanel Margin="0,0,0,12">
    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-    <ComboBox Width="300" ItemsSource="{Binding Session.History}" DisplayMemberPath="Label" SelectedItem="{Binding Session.SelectedSnapshot}" IsEnabled="{Binding Session.CanInteract}" AutomationProperties.Name="Selected snapshot" Margin="0,0,8,0"/>
-    <ComboBox Width="180" ItemsSource="{Binding Session.SnapshotRoots}" SelectedItem="{Binding Session.CurrentRoot}" IsEnabled="{Binding Session.CanInteract}" AutomationProperties.Name="Root in snapshot" Margin="0,0,8,0"/>
+    <ComboBox Width="280" ItemsSource="{Binding Session.History}" DisplayMemberPath="Label" SelectedItem="{Binding Session.SelectedSnapshot}" IsEnabled="{Binding Session.CanInteract}" AutomationProperties.Name="Selected snapshot" Margin="0,0,8,0"/>
+    <ComboBox Width="160" ItemsSource="{Binding Session.SnapshotRoots}" SelectedItem="{Binding Session.CurrentRoot}" IsEnabled="{Binding Session.CanInteract}" AutomationProperties.Name="Root in snapshot" Margin="0,0,8,0"/>
     <Button Command="{Binding ExportCommand}" Margin="0,0,8,0" ToolTip="Ctrl+E">
      <StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource Icon}" Text="&#xEDE1;" Margin="0,0,8,0"/><TextBlock Text="Export"/></StackPanel>
     </Button>
@@ -14,98 +14,223 @@
      <StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource Icon}" Text="&#xE72C;" Margin="0,0,8,0"/><TextBlock Text="Rescan"/></StackPanel>
     </Button>
    </StackPanel>
-   <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
-    <TextBlock Text="{Binding BrowseLabel}" Style="{StaticResource SubtitleText}" TextTrimming="CharacterEllipsis"/>
-    <TextBlock Text="{Binding BrowseCaption}" Style="{StaticResource CaptionText}"/>
-   </StackPanel>
-  </DockPanel>
-
-  <!-- Summary -->
-  <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,0,0,12" Padding="20,12">
-   <StackPanel>
-    <TextBlock Text="{Binding SummaryText}" Style="{StaticResource BodyStrongText}" FontSize="16" Typography.NumeralAlignment="Tabular"/>
-    <TextBlock Text="{Binding CoverageText}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,2,0,0"/>
-   </StackPanel>
-  </Border>
-
-  <!-- Space map toolbar -->
-  <DockPanel Grid.Row="2" Margin="0,0,0,8">
-   <Button DockPanel.Dock="Right" Style="{StaticResource SubtleButton}" Content="Largest files" Command="{Binding LargestCommand}"/>
-   <StackPanel Orientation="Horizontal">
+   <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
     <Button Style="{StaticResource IconButton}" Content="&#xE74A;" Command="{Binding UpCommand}" AutomationProperties.Name="Up one level" ToolTip="Up one level (Alt+Up)" Margin="0,0,8,0"/>
-    <TextBlock Text="Space map" Style="{StaticResource BodyStrongText}" VerticalAlignment="Center"/>
-    <TextBlock Text="Click a folder to open it." Style="{StaticResource CaptionText}" VerticalAlignment="Center" Margin="10,0,0,0"/>
+    <ItemsControl ItemsSource="{Binding Breadcrumbs}" Focusable="False" AutomationProperties.Name="Location" VerticalAlignment="Center">
+     <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+     <ItemsControl.ItemTemplate>
+      <DataTemplate>
+       <StackPanel Orientation="Horizontal">
+        <Button Command="{Binding DataContext.CrumbCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding Path}" ToolTip="{Binding Path}" Padding="4,0" MinHeight="0">
+         <Button.Style>
+          <Style TargetType="Button" BasedOn="{StaticResource SubtleButton}">
+           <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}"/>
+           <Style.Triggers><DataTrigger Binding="{Binding IsLast}" Value="True"><Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}"/></DataTrigger></Style.Triggers>
+          </Style>
+         </Button.Style>
+         <TextBlock Text="{Binding Name}" FontFamily="{StaticResource DisplayFont}" FontSize="20" FontWeight="SemiBold" MaxWidth="260" TextTrimming="CharacterEllipsis"/>
+        </Button>
+        <TextBlock Style="{StaticResource Icon}" Text="&#xE76C;" FontSize="12" Margin="2,2,2,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}">
+         <TextBlock.Visibility><Binding Path="IsLast" Converter="{StaticResource Hidden}"/></TextBlock.Visibility>
+        </TextBlock>
+       </StackPanel>
+      </DataTemplate>
+     </ItemsControl.ItemTemplate>
+    </ItemsControl>
+    <TextBlock Text="{Binding LocationText}" Style="{StaticResource CaptionText}" VerticalAlignment="Center" Margin="12,4,0,0" Typography.NumeralAlignment="Tabular"/>
    </StackPanel>
   </DockPanel>
-  <Border Grid.Row="3" CornerRadius="8" ClipToBounds="True" Margin="0,0,0,12">
-   <views:Treemap Items="{Binding MapItems}" FolderChosen="Treemap_FolderChosen" AutomationProperties.Name="Space map"/>
-  </Border>
 
-  <!-- Lists -->
-  <Border Grid.Row="4" Style="{StaticResource Card}" Padding="0">
+  <!-- Volume summary -->
+  <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,0,0,12" Padding="20,12">
    <DockPanel>
-    <Border DockPanel.Dock="Top" Style="{StaticResource CardHeader}" Padding="12,8">
-     <WrapPanel>
-      <Border Style="{StaticResource SegmentTrack}" Margin="0,0,12,4">
-       <StackPanel Orientation="Horizontal">
-        <RadioButton Style="{StaticResource Segment}" GroupName="ExplorerList" Content="Files" IsChecked="{Binding ShowFiles}"/>
-        <RadioButton Style="{StaticResource Segment}" GroupName="ExplorerList" Content="Folders" IsChecked="{Binding ShowFolders}"/>
-        <RadioButton Style="{StaticResource Segment}" GroupName="ExplorerList" Content="Types" IsChecked="{Binding ShowTypes}"/>
-       </StackPanel>
-      </Border>
-      <StackPanel Orientation="Horizontal" Visibility="{Binding ShowFiles, Converter={StaticResource Visible}}" Margin="0,0,0,4">
-       <TextBox Width="190" Text="{Binding Search}" AutomationProperties.Name="Filter by name or path" ToolTip="Name or path" Margin="0,0,8,0"/>
-       <TextBox Width="70" Text="{Binding Extension}" AutomationProperties.Name="Extension filter" ToolTip="Extension, for example .mkv" Margin="0,0,8,0"/>
-       <TextBox Width="70" Text="{Binding MinimumMiB}" AutomationProperties.Name="Minimum size in MiB" ToolTip="Minimum size in MiB" Margin="0,0,8,0"/>
-       <DatePicker Width="140" SelectedDate="{Binding ModifiedAfter}" AutomationProperties.Name="Modified on or after" ToolTip="Modified on or after" Margin="0,0,12,0"/>
-       <CheckBox Content="Allocated size" IsChecked="{Binding Allocated}" VerticalAlignment="Center" Margin="0,0,12,0"/>
-       <CheckBox Content="Hidden only" IsChecked="{Binding HiddenOnly}" VerticalAlignment="Center" Margin="0,0,12,0"/>
-       <Button Content="Filter" Command="{Binding FilterCommand}" IsDefault="False"/>
-      </StackPanel>
-     </WrapPanel>
-    </Border>
-    <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" Padding="12,8" Visibility="{Binding ShowFiles, Converter={StaticResource Visible}}">
-     <DockPanel>
-      <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-       <Button Style="{StaticResource SubtleButton}" Click="Explorer_Click" ToolTip="Show the selected file in File Explorer"><StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource Icon}" Text="&#xE838;" Margin="0,0,8,0"/><TextBlock Text="Explorer"/></StackPanel></Button>
-       <Button Style="{StaticResource SubtleButton}" Click="Copy_Click"><StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource Icon}" Text="&#xE8C8;" Margin="0,0,8,0"/><TextBlock Text="Copy path"/></StackPanel></Button>
-       <Button Style="{StaticResource SubtleButton}" Click="Properties_Click"><StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource Icon}" Text="&#xE946;" Margin="0,0,8,0"/><TextBlock Text="Properties"/></StackPanel></Button>
-       <Button Click="CleanupFiles_Click" Margin="8,0,0,0" IsEnabled="{Binding Session.CanInteract}"><StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource Icon}" Text="&#xE7B8;" Margin="0,0,8,0"/><TextBlock Text="Review for cleanup…"/></StackPanel></Button>
-      </StackPanel>
-      <StackPanel Orientation="Horizontal">
-       <Button Style="{StaticResource IconButton}" Content="&#xE76B;" Command="{Binding PreviousCommand}" AutomationProperties.Name="Previous page"/>
-       <Button Style="{StaticResource IconButton}" Content="&#xE76C;" Command="{Binding NextCommand}" AutomationProperties.Name="Next page"/>
-       <TextBlock Text="{Binding PageLabel}" Style="{StaticResource CaptionText}" VerticalAlignment="Center" Margin="8,0,0,0"/>
-      </StackPanel>
-     </DockPanel>
-    </Border>
-    <Grid>
-     <DataGrid x:Name="FilesGrid" Style="{StaticResource ListGrid}" ItemsSource="{Binding Files}" MouseDoubleClick="Files_DoubleClick" AutomationProperties.Name="Largest files" Visibility="{Binding ShowFiles, Converter={StaticResource Visible}}">
-      <DataGrid.Columns>
-       <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="220"/>
-       <DataGridCheckBoxColumn Header="Folder" Binding="{Binding IsDirectory}" Width="72"/>
-       <DataGridTextColumn Header="Logical" Binding="{Binding SizeText}" Width="90"/>
-       <DataGridTextColumn Header="Allocated" Binding="{Binding AllocatedText}" Width="90"/>
-       <DataGridTextColumn Header="Modified" Binding="{Binding ModifiedText}" Width="140"/>
-       <DataGridTextColumn Header="Path" Binding="{Binding Path}" Width="*"/>
-      </DataGrid.Columns>
-     </DataGrid>
-     <DataGrid Style="{StaticResource ListGrid}" ItemsSource="{Binding Folders}" MouseDoubleClick="Folders_DoubleClick" AutomationProperties.Name="Largest folders" Visibility="{Binding ShowFolders, Converter={StaticResource Visible}}">
-      <DataGrid.Columns>
-       <DataGridTextColumn Header="Folder" Binding="{Binding Name}" Width="*"/>
-       <DataGridTextColumn Header="Bytes" Binding="{Binding Bytes, StringFormat=N0}" Width="160"/>
-       <DataGridTextColumn Header="Files" Binding="{Binding Count, StringFormat=N0}" Width="110"/>
-      </DataGrid.Columns>
-     </DataGrid>
-     <DataGrid Style="{StaticResource ListGrid}" ItemsSource="{Binding ExtensionsBreakdown}" AutomationProperties.Name="File types" Visibility="{Binding ShowTypes, Converter={StaticResource Visible}}">
-      <DataGrid.Columns>
-       <DataGridTextColumn Header="Extension" Binding="{Binding Name}" Width="*"/>
-       <DataGridTextColumn Header="Logical bytes" Binding="{Binding Bytes, StringFormat=N0}" Width="160"/>
-       <DataGridTextColumn Header="Files" Binding="{Binding Count, StringFormat=N0}" Width="110"/>
-      </DataGrid.Columns>
-     </DataGrid>
-    </Grid>
+    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="24,0,0,0" VerticalAlignment="Center">
+     <Rectangle Width="1" Fill="{DynamicResource DividerStrokeColorDefaultBrush}" Margin="0,0,24,0"/>
+     <StackPanel Margin="0,0,28,0"><TextBlock Text="Files" Style="{StaticResource CaptionText}"/><TextBlock Text="{Binding FilesText}" Style="{StaticResource MetricValue}"/></StackPanel>
+     <StackPanel Margin="0,0,28,0"><TextBlock Text="Logical" Style="{StaticResource CaptionText}"/><TextBlock Text="{Binding LogicalText}" Style="{StaticResource MetricValue}"/></StackPanel>
+     <StackPanel Margin="0,0,28,0"><TextBlock Text="Allocated" Style="{StaticResource CaptionText}"/><TextBlock Text="{Binding AllocatedText}" Style="{StaticResource MetricValue}"/></StackPanel>
+     <StackPanel><TextBlock Text="Diagnostics" Style="{StaticResource CaptionText}"/><TextBlock Text="{Binding DiagnosticsText}" Style="{StaticResource MetricValue}"/></StackPanel>
+    </StackPanel>
+    <StackPanel>
+     <StackPanel Orientation="Horizontal">
+      <TextBlock Text="{Binding VolumeTitle}" Style="{StaticResource BodyStrongText}"/>
+      <TextBlock Text="{Binding VolumeCaption}" Style="{StaticResource CaptionText}" Margin="8,0,0,0" VerticalAlignment="Center" Typography.NumeralAlignment="Tabular"/>
+     </StackPanel>
+     <views:UsageBar Segments="{Binding Segments}" Total="{Binding BarTotal}" Margin="0,8" AutomationProperties.Name="Usage by file type or age"/>
+     <ItemsControl ItemsSource="{Binding Legend}" Focusable="False">
+      <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+      <ItemsControl.ItemTemplate>
+       <DataTemplate>
+        <StackPanel Orientation="Horizontal" Margin="0,0,14,2">
+         <Rectangle Width="10" Height="10" RadiusX="3" RadiusY="3" Fill="{Binding Fill}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+         <TextBlock Style="{StaticResource CaptionText}" Typography.NumeralAlignment="Tabular"><Run Text="{Binding Label, Mode=OneWay}"/><Run Text=" "/><Run Text="{Binding Value, Mode=OneWay}" Foreground="{DynamicResource TextFillColorTertiaryBrush}"/></TextBlock>
+        </StackPanel>
+       </DataTemplate>
+      </ItemsControl.ItemTemplate>
+     </ItemsControl>
+     <TextBlock Text="{Binding CoverageText}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+    </StackPanel>
    </DockPanel>
   </Border>
+
+  <Grid Grid.Row="2">
+   <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="16"/><ColumnDefinition Width="300"/></Grid.ColumnDefinitions>
+   <Grid>
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="230"/><RowDefinition/></Grid.RowDefinitions>
+    <!-- Space map toolbar -->
+    <DockPanel Margin="0,0,0,8">
+     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+      <TextBlock Text="Color" Style="{StaticResource CaptionText}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+      <Border Style="{StaticResource SegmentTrack}" Margin="0,0,16,0">
+       <StackPanel Orientation="Horizontal">
+        <RadioButton Style="{StaticResource Segment}" GroupName="MapColor" Content="Type" IsChecked="{Binding ColorByType}"/>
+        <RadioButton Style="{StaticResource Segment}" GroupName="MapColor" Content="Age" IsChecked="{Binding ColorByAge}"/>
+       </StackPanel>
+      </Border>
+      <TextBlock Text="Size" Style="{StaticResource CaptionText}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+      <Border Style="{StaticResource SegmentTrack}" IsEnabled="{Binding Session.CanInteract}">
+       <StackPanel Orientation="Horizontal">
+        <RadioButton Style="{StaticResource Segment}" GroupName="MapSize" Content="Logical" IsChecked="{Binding ShowLogical}"/>
+        <RadioButton Style="{StaticResource Segment}" GroupName="MapSize" Content="Allocated" IsChecked="{Binding ShowAllocated}"/>
+       </StackPanel>
+      </Border>
+     </StackPanel>
+     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+      <TextBlock Text="Space map" Style="{StaticResource BodyStrongText}"/>
+      <TextBlock Text="{Binding MapHint}" Style="{StaticResource CaptionText}" Margin="10,0,12,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+     </StackPanel>
+    </DockPanel>
+    <views:Treemap x:Name="Map" Grid.Row="1" Margin="0,0,0,12" Items="{Binding MapItems}" ColorByAge="{Binding ColorByAge}" SelectedPath="{Binding SelectedPath}" FolderChosen="Treemap_FolderChosen" TileSelected="Treemap_TileSelected" AutomationProperties.Name="Space map. Arrow keys move between tiles; Enter opens a folder."/>
+
+    <!-- Lists -->
+    <Border Grid.Row="2" Style="{StaticResource Card}" Padding="0">
+     <DockPanel>
+      <Border DockPanel.Dock="Top" Style="{StaticResource CardHeader}" Padding="12,8">
+       <WrapPanel>
+        <Border Style="{StaticResource SegmentTrack}" Margin="0,14,12,4" VerticalAlignment="Top">
+         <StackPanel Orientation="Horizontal">
+          <RadioButton Style="{StaticResource Segment}" GroupName="ExplorerList" Content="Files" IsChecked="{Binding ShowFiles}"/>
+          <RadioButton Style="{StaticResource Segment}" GroupName="ExplorerList" Content="Folders" IsChecked="{Binding ShowFolders}"/>
+          <RadioButton Style="{StaticResource Segment}" GroupName="ExplorerList" Content="Types" IsChecked="{Binding ShowTypes}"/>
+         </StackPanel>
+        </Border>
+        <WrapPanel Visibility="{Binding ShowFiles, Converter={StaticResource Visible}}">
+         <StackPanel Margin="0,0,8,4"><TextBlock Text="Name or path" Style="{StaticResource FieldLabel}"/><TextBox Width="170" Text="{Binding Search}" AutomationProperties.Name="Filter by name or path"/></StackPanel>
+         <StackPanel Margin="0,0,8,4"><TextBlock Text="Extension" Style="{StaticResource FieldLabel}"/><TextBox Width="70" Text="{Binding Extension}" AutomationProperties.Name="Extension filter"/></StackPanel>
+         <StackPanel Margin="0,0,8,4"><TextBlock Text="Min. MiB" Style="{StaticResource FieldLabel}"/><TextBox Width="64" Text="{Binding MinimumMiB}" AutomationProperties.Name="Minimum size in MiB"/></StackPanel>
+         <StackPanel Margin="0,0,12,4"><TextBlock Text="Modified since" Style="{StaticResource FieldLabel}"/><DatePicker Width="136" SelectedDate="{Binding ModifiedAfter}" AutomationProperties.Name="Modified on or after"/></StackPanel>
+         <CheckBox Content="Hidden only" IsChecked="{Binding HiddenOnly}" VerticalAlignment="Bottom" Margin="0,0,12,8"/>
+         <Button Content="Filter" Command="{Binding FilterCommand}" VerticalAlignment="Bottom" Margin="0,0,0,4"/>
+        </WrapPanel>
+       </WrapPanel>
+      </Border>
+      <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" Padding="12,6" Visibility="{Binding ShowFiles, Converter={StaticResource Visible}}">
+       <DockPanel>
+        <Button DockPanel.Dock="Right" Click="CleanupFiles_Click" IsEnabled="{Binding Session.CanInteract}" ToolTip="Review the selected files for quarantine">
+         <StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource Icon}" Text="&#xE7B8;" Margin="0,0,8,0"/><TextBlock Text="Review selected for cleanup…"/></StackPanel>
+        </Button>
+        <StackPanel Orientation="Horizontal">
+         <Button Style="{StaticResource IconButton}" Content="&#xE76B;" Command="{Binding PreviousCommand}" AutomationProperties.Name="Previous page"/>
+         <Button Style="{StaticResource IconButton}" Content="&#xE76C;" Command="{Binding NextCommand}" AutomationProperties.Name="Next page"/>
+         <TextBlock Text="{Binding PageLabel}" Style="{StaticResource CaptionText}" VerticalAlignment="Center" Margin="8,0,0,0"/>
+        </StackPanel>
+       </DockPanel>
+      </Border>
+      <Grid>
+       <DataGrid x:Name="FilesGrid" Style="{StaticResource ListGrid}" ItemsSource="{Binding Files}" MouseDoubleClick="Files_DoubleClick" SelectionChanged="Files_SelectionChanged" AutomationProperties.Name="Largest files" Visibility="{Binding ShowFiles, Converter={StaticResource Visible}}">
+        <DataGrid.Columns>
+         <DataGridTemplateColumn Header="Name" Width="2*" SortMemberPath="Entry.Name">
+          <DataGridTemplateColumn.CellTemplate><DataTemplate>
+           <StackPanel Orientation="Horizontal"><Rectangle Width="10" Height="10" RadiusX="3" RadiusY="3" Fill="{Binding Swatch}" Margin="4,0,10,0"/><TextBlock Text="{Binding Entry.Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/></StackPanel>
+          </DataTemplate></DataGridTemplateColumn.CellTemplate>
+         </DataGridTemplateColumn>
+         <DataGridTemplateColumn Header="Size" Width="130">
+          <DataGridTemplateColumn.CellTemplate><DataTemplate>
+           <DockPanel>
+            <TextBlock DockPanel.Dock="Right" Text="{Binding Entry.SizeText}" Width="66" TextAlignment="Right" Typography.NumeralAlignment="Tabular"/>
+            <Border Height="6" Width="48" CornerRadius="3" Background="{DynamicResource ControlAltFillColorSecondaryBrush}" HorizontalAlignment="Left">
+             <Border Height="6" Width="{Binding BarWidth}" CornerRadius="3" Background="{DynamicResource AccentFillColorDefaultBrush}" HorizontalAlignment="Left"/>
+            </Border>
+           </DockPanel>
+          </DataTemplate></DataGridTemplateColumn.CellTemplate>
+         </DataGridTemplateColumn>
+         <DataGridTextColumn Header="Allocated" Binding="{Binding Entry.AllocatedText}" Width="90"/>
+         <DataGridTextColumn Header="Modified" Binding="{Binding Entry.ModifiedText}" Width="140"/>
+         <DataGridTextColumn Header="Folder" Binding="{Binding Entry.Parent}" Width="3*">
+          <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="FontFamily" Value="{StaticResource MonoFont}"/><Setter Property="FontSize" Value="12"/><Setter Property="TextTrimming" Value="CharacterEllipsis"/><Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}"/></Style></DataGridTextColumn.ElementStyle>
+         </DataGridTextColumn>
+        </DataGrid.Columns>
+       </DataGrid>
+       <DataGrid Style="{StaticResource ListGrid}" ItemsSource="{Binding Folders}" MouseDoubleClick="Folders_DoubleClick" AutomationProperties.Name="Largest folders" Visibility="{Binding ShowFolders, Converter={StaticResource Visible}}">
+        <DataGrid.Columns>
+         <DataGridTextColumn Header="Folder" Binding="{Binding Name}" Width="*"/>
+         <DataGridTextColumn Header="Bytes" Binding="{Binding Bytes, StringFormat=N0}" Width="160"/>
+         <DataGridTextColumn Header="Files" Binding="{Binding Count, StringFormat=N0}" Width="110"/>
+        </DataGrid.Columns>
+       </DataGrid>
+       <DataGrid Style="{StaticResource ListGrid}" ItemsSource="{Binding ExtensionsBreakdown}" AutomationProperties.Name="File types" Visibility="{Binding ShowTypes, Converter={StaticResource Visible}}">
+        <DataGrid.Columns>
+         <DataGridTextColumn Header="Extension" Binding="{Binding Name}" Width="*"/>
+         <DataGridTextColumn Header="Logical bytes" Binding="{Binding Bytes, StringFormat=N0}" Width="160"/>
+         <DataGridTextColumn Header="Files" Binding="{Binding Count, StringFormat=N0}" Width="110"/>
+        </DataGrid.Columns>
+       </DataGrid>
+      </Grid>
+     </DockPanel>
+    </Border>
+   </Grid>
+
+   <!-- Inspector -->
+   <Border Grid.Column="2" Style="{StaticResource Card}" Padding="0">
+    <Grid>
+     <TextBlock Text="Select a tile or a file to see its details." Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="18" Visibility="{Binding HasInspection, Converter={StaticResource Hidden}}"/>
+     <DockPanel DataContext="{Binding Inspection}" Visibility="{Binding DataContext.HasInspection, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource Visible}}">
+      <StackPanel DockPanel.Dock="Bottom" Margin="18,0,18,16">
+       <UniformGrid Columns="3" Margin="0,0,0,8">
+        <Button Margin="0,0,4,0" Padding="4,6" Click="InspectorExplorer_Click" ToolTip="Show in File Explorer"><StackPanel><TextBlock Style="{StaticResource Icon}" Text="&#xE838;" HorizontalAlignment="Center"/><TextBlock Text="Explorer" FontSize="12" HorizontalAlignment="Center" Margin="0,2,0,0"/></StackPanel></Button>
+        <Button Margin="2,0" Padding="4,6" Click="InspectorCopy_Click"><StackPanel><TextBlock Style="{StaticResource Icon}" Text="&#xE8C8;" HorizontalAlignment="Center"/><TextBlock Text="Copy path" FontSize="12" HorizontalAlignment="Center" Margin="0,2,0,0"/></StackPanel></Button>
+        <Button Margin="4,0,0,0" Padding="4,6" Click="InspectorProperties_Click"><StackPanel><TextBlock Style="{StaticResource Icon}" Text="&#xE946;" HorizontalAlignment="Center"/><TextBlock Text="Properties" FontSize="12" HorizontalAlignment="Center" Margin="0,2,0,0"/></StackPanel></Button>
+       </UniformGrid>
+       <Button HorizontalAlignment="Stretch" Click="InspectorCleanup_Click" Visibility="{Binding IsFile, Converter={StaticResource Visible}}" IsEnabled="{Binding DataContext.Session.CanInteract, RelativeSource={RelativeSource AncestorType=UserControl}}">
+        <StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource Icon}" Text="&#xE7B8;" Margin="0,0,8,0"/><TextBlock Text="Review for cleanup…"/></StackPanel>
+       </Button>
+       <Button HorizontalAlignment="Stretch" Click="InspectorOpen_Click" Visibility="{Binding IsDirectory, Converter={StaticResource Visible}}">
+        <StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource Icon}" Text="&#xE838;" Margin="0,0,8,0"/><TextBlock Text="Open in space map"/></StackPanel>
+       </Button>
+      </StackPanel>
+      <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
+       <StackPanel Margin="18,16">
+        <DockPanel>
+         <Border Width="40" Height="40" CornerRadius="6" Background="{Binding Swatch}" Margin="0,0,12,0" VerticalAlignment="Top"/>
+         <StackPanel>
+          <TextBlock Text="{Binding Name}" Style="{StaticResource BodyStrongText}" FontSize="16" TextWrapping="Wrap"/>
+          <TextBlock Text="{Binding Kind}" Style="{StaticResource CaptionText}"/>
+         </StackPanel>
+        </DockPanel>
+        <TextBlock Text="{Binding Size}" FontFamily="{StaticResource DisplayFont}" FontSize="28" FontWeight="SemiBold" Margin="0,14,0,0" Typography.NumeralAlignment="Tabular" Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+        <TextBlock Text="{Binding Share}" Style="{StaticResource CaptionText}" Margin="0,0,0,6"/>
+        <ProgressBar Style="{StaticResource CapacityBar}" Value="{Binding SharePercent, Mode=OneWay}" AutomationProperties.Name="Share of this root"/>
+        <Border Style="{StaticResource Callout}" Margin="0,14,0,0" Visibility="{Binding HasNote, Converter={StaticResource Visible}}">
+         <TextBlock Text="{Binding Note}" Style="{StaticResource CaptionText}" Foreground="{DynamicResource TextFillColorPrimaryBrush}" TextWrapping="Wrap"/>
+        </Border>
+        <Rectangle Height="1" Fill="{DynamicResource DividerStrokeColorDefaultBrush}" Margin="-18,14"/>
+        <TextBlock Text="Folder" Style="{StaticResource CaptionText}"/>
+        <TextBlock Text="{Binding Folder}" Style="{StaticResource MonoText}" TextWrapping="Wrap" Margin="0,2,0,10"/>
+        <StackPanel Visibility="{Binding IsFile, Converter={StaticResource Visible}}">
+         <TextBlock Text="Allocated" Style="{StaticResource CaptionText}"/>
+         <TextBlock Text="{Binding Allocated}" Margin="0,2,0,10" Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+         <TextBlock Text="Modified" Style="{StaticResource CaptionText}"/>
+         <TextBlock Text="{Binding Modified}" Margin="0,2,0,10" Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+         <TextBlock Text="Attributes" Style="{StaticResource CaptionText}"/>
+         <TextBlock Text="{Binding Attributes}" Margin="0,2,0,10" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+         <TextBlock Text="File ID" Style="{StaticResource CaptionText}"/>
+         <TextBlock Text="{Binding Identity}" Style="{StaticResource MonoText}" TextWrapping="Wrap" Margin="0,2,0,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+        </StackPanel>
+       </StackPanel>
+      </ScrollViewer>
+     </DockPanel>
+    </Grid>
+   </Border>
+  </Grid>
  </Grid>
 </UserControl>

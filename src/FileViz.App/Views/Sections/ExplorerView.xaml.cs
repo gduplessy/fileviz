@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -14,8 +13,13 @@ public partial class ExplorerView : UserControl
     private ExplorerViewModel Model => (ExplorerViewModel)DataContext;
     private void Files_DoubleClick(object sender, MouseButtonEventArgs e)
     {
-        if (FilesGrid.SelectedItem is FileEntry entry && entry.IsDirectory)
-            Model.Navigate(entry.Path);
+        if (FilesGrid.SelectedItem is FileRow { Entry.IsDirectory: true } row)
+            Model.Navigate(row.Entry.Path);
+    }
+    private void Files_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (FilesGrid.SelectedItem is FileRow row)
+            Model.Inspect(row.Entry);
     }
     private void Folders_DoubleClick(object sender, MouseButtonEventArgs e)
     {
@@ -23,37 +27,35 @@ public partial class ExplorerView : UserControl
             Model.Navigate(folder.Name);
     }
     private void Treemap_FolderChosen(object? sender, string path) => Model.Navigate(path);
-    private void Explorer_Click(object sender, RoutedEventArgs e)
-    {
-        if (FilesGrid.SelectedItem is not FileEntry file)
-            return;
-        var info = new ProcessStartInfo("explorer.exe") { UseShellExecute = true };
-        info.ArgumentList.Add("/select,");
-        info.ArgumentList.Add(file.Path);
-        Process.Start(info);
-    }
-    private void Copy_Click(object sender, RoutedEventArgs e)
-    {
-        if (FilesGrid.SelectedItem is FileEntry file)
-            Clipboard.SetText(file.Path);
-    }
-    private void Properties_Click(object sender, RoutedEventArgs e)
-    {
-        if (FilesGrid.SelectedItem is not FileEntry file)
-            return;
-        var info = new ShellExecuteInfo { Size = Marshal.SizeOf<ShellExecuteInfo>(), Mask = 12, Verb = "properties", File = file.Path, Show = 1 };
-        if (!ShellExecuteExW(ref info))
-            Model.Session.Status = new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error()).Message;
-    }
+    private void Treemap_TileSelected(object? sender, MapNode node) => Model.Inspect(node);
     private void CleanupFiles_Click(object sender, RoutedEventArgs e)
     {
-        var selections = FilesGrid.SelectedItems.Cast<FileEntry>().Where(x => !x.IsDirectory).Select(x => new CleanupSelection(x)).ToArray();
+        var selections = FilesGrid.SelectedItems.Cast<FileRow>().Where(x => !x.Entry.IsDirectory).Select(x => new CleanupSelection(x.Entry)).ToArray();
         ReviewDialog.Review(Window.GetWindow(this), Model.Session, Model.Cleanup, selections);
     }
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-    private struct ShellExecuteInfo
+    private void InspectorExplorer_Click(object sender, RoutedEventArgs e)
     {
-        public int Size; public uint Mask; public IntPtr Window; public string? Verb, File, Parameters, Directory; public int Show; public IntPtr Instance, IdList; public string? Class; public IntPtr ClassKey; public uint HotKey; public IntPtr Icon, Process;
+        if (Model.Inspection is { } item)
+            Shell.ShowInExplorer(item.Path);
     }
-    [DllImport("shell32.dll", CharSet = CharSet.Unicode, SetLastError = true)][return: MarshalAs(UnmanagedType.Bool)] private static extern bool ShellExecuteExW(ref ShellExecuteInfo info);
+    private void InspectorCopy_Click(object sender, RoutedEventArgs e)
+    {
+        if (Model.Inspection is { } item)
+            Clipboard.SetText(item.Path);
+    }
+    private void InspectorProperties_Click(object sender, RoutedEventArgs e)
+    {
+        if (Model.Inspection is { } item && Shell.ShowProperties(item.Path) is { } error)
+            Model.Session.Status = error;
+    }
+    private void InspectorOpen_Click(object sender, RoutedEventArgs e)
+    {
+        if (Model.Inspection is { IsDirectory: true } item)
+            Model.Navigate(item.Path);
+    }
+    private void InspectorCleanup_Click(object sender, RoutedEventArgs e)
+    {
+        if (Model.Inspection is { IsFile: true } item && Model.Session.Store.Entry(Model.Session.Active, item.Path) is { } entry)
+            ReviewDialog.Review(Window.GetWindow(this), Model.Session, Model.Cleanup, [new CleanupSelection(entry)]);
+    }
 }

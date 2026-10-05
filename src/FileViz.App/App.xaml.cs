@@ -88,6 +88,13 @@ public partial class App : Application
                         window.Model.SelectedNav = item;
                         await Capture(ThemeMode.Light, $"section-{item.Label.ToLowerInvariant()}.png");
                         await Capture(ThemeMode.Dark, $"section-{item.Label.ToLowerInvariant()}-dark.png");
+                        if (item.Content == window.Model.Explorer)
+                        {
+                            window.Model.Explorer.ColorByAge = true;
+                            await Capture(ThemeMode.Light, "section-explorer-age.png");
+                            await Capture(ThemeMode.Dark, "section-explorer-age-dark.png");
+                            window.Model.Explorer.ColorByAge = false;
+                        }
                     }
                 File.WriteAllText(Path.Combine(Path.GetFullPath(e.Args[2]), "smoke.json"), System.Text.Json.JsonSerializer.Serialize(new
                 {
