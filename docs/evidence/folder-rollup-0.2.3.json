@@ -1,0 +1,103 @@
+{
+  "Kind": "Synthetic branching folder rollup (no filesystem reads)",
+  "Branches": 100000,
+  "Folders": 200000,
+  "Files": 100000,
+  "IngestSeconds": 5.964001,
+  "FinalizeSeconds": 23.8923719,
+  "Stages": [
+    {
+      "Stage": "Starting",
+      "Seconds": 0.0127363
+    },
+    {
+      "Stage": "Preparing file views (1/7): parent",
+      "Seconds": 1.5170605
+    },
+    {
+      "Stage": "Preparing file views (2/7): parent allocated",
+      "Seconds": 0.7726606000000003
+    },
+    {
+      "Stage": "Preparing file views (3/7): size",
+      "Seconds": 1.6736988
+    },
+    {
+      "Stage": "Preparing file views (4/7): allocated",
+      "Seconds": 1.0936646999999997
+    },
+    {
+      "Stage": "Preparing file views (5/7): identity",
+      "Seconds": 1.7929944000000004
+    },
+    {
+      "Stage": "Preparing file views (6/7): name",
+      "Seconds": 0.6392017000000001
+    },
+    {
+      "Stage": "Preparing file views (7/7): extension",
+      "Seconds": 0.6194493999999988
+    },
+    {
+      "Stage": "Optimizing file queries",
+      "Seconds": 0.6953717000000008
+    },
+    {
+      "Stage": "Calculating folder sizes",
+      "Seconds": 0.00138510000000025
+    },
+    {
+      "Stage": "Initializing folder views",
+      "Seconds": 2.5879581
+    },
+    {
+      "Stage": "Locating hard-link allocation owners",
+      "Seconds": 0.13796959999999991
+    },
+    {
+      "Stage": "Summing direct folder files",
+      "Seconds": 1.4412607000000008
+    },
+    {
+      "Stage": "Rolling up folder depth 1 of 4",
+      "Seconds": 1.5927306999999988
+    },
+    {
+      "Stage": "Rolling up folder depth 2 of 4",
+      "Seconds": 0.08103000000000016
+    },
+    {
+      "Stage": "Rolling up folder depth 3 of 4",
+      "Seconds": 0.0007804999999994067
+    },
+    {
+      "Stage": "Rolling up folder depth 4 of 4",
+      "Seconds": 0.000764000000000209
+    },
+    {
+      "Stage": "Calculating file types and ages",
+      "Seconds": 4.028862100000001
+    },
+    {
+      "Stage": "Preparing folder navigation: logical",
+      "Seconds": 0.8593809999999991
+    },
+    {
+      "Stage": "Preparing folder navigation: allocated",
+      "Seconds": 1.6194316999999998
+    },
+    {
+      "Stage": "Summarizing drive usage",
+      "Seconds": 2.2463985000000015
+    },
+    {
+      "Stage": "Saving snapshot",
+      "Seconds": 0.22012989999999988
+    }
+  ],
+  "Runtime": "10.0.12",
+  "OS": "Microsoft Windows NT 10.0.26100.0",
+  "CpuCount": 12,
+  "PeakWorkingSet": 144351232,
+  "DatabaseBytes": 315916288
+}

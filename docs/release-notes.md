@@ -27,6 +27,8 @@ Close an old FileViz process before upgrading: replacing its binaries cannot pat
 
 ## Verification and limits
 
+- Complete 0.2.3 branching fixture: 100,000 files / 200,000 folders finalized in 23.89 seconds, 137.66 MiB process peak, including navigation indexes. This synthetic metadata benchmark is not full-drive throughput. [Evidence](https://github.com/gduplessy/fileviz/blob/main/docs/evidence/folder-rollup-0.2.3.json).
+
 - Release build: zero warnings/errors; all 59 regression tests passed.
 - Branching metadata fixture, 8,000 files / 16,000 folders: finalization 55.19 → 5.66 seconds. Patched 100,000 files / 200,000 folders: 33.29 seconds, 123.43 MiB peak working set. Single runs under shared load; no end-to-end scan speed claim. [Evidence](https://github.com/gduplessy/fileviz/blob/main/docs/evidence/folder-rollup-0.2.2.json).
 - Disposable tests verify hard-link allocation once per identity, unknown allocation, empty folders, repeat rebuilds, and actual executing-query cancellation within two seconds.
