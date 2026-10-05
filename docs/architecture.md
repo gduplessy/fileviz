@@ -1,5 +1,30 @@
 # Architecture
 
-The WPF shell owns SQLite writes and paged views. Isolated workers enumerate or hash files through authenticated local named pipes. Scan engines emit bounded batches and diagnostics. The raw NTFS engine is read-only and falls back to native directory enumeration when unsupported or inconsistent.
+## Projects and boundaries
 
-File identities and path entries are separate concepts: hard links are multiple names for one allocation. Scan snapshots are observations of a changing filesystem, not atomic backups. Cleanup performs fresh verification independently of cached analysis.
+- `FileViz.Core`: immutable metadata/request contracts, path rules, and bounded length-framed JSON IPC.
+- `FileViz.Windows`: native directory enumeration, read-only NTFS scanner/parser, hashing, authenticated worker sessions, and reviewed cleanup interop.
+- `FileViz.Data`: SQLite snapshots, path entries/file identities, partial indexes, materialized totals, staged duplicate work, profiles, reports, and action journals.
+- `FileViz.Worker`: isolated scan/metadata/hash process. Normal or same-user UAC elevation; no database writes, cleanup requests, drivers, volume locks, or arbitrary command execution.
+- `FileViz.App`: WPF view models, commands, paged collections, treemap, and review dialogs.
+- `FileViz.Tests` / `FileViz.Benchmarks`: disposable correctness fixtures and reproducible component/engine measurements.
+
+The UI owns SQLite writes through background service connections. A current-user-only random named pipe accepts the launched worker PID; the worker validates its parent/server PID. A dedicated worker thread monitors pipe disconnection and exits even if provider I/O blocks the scan thread. The UI also kills unresponsive workers when its token permits it. Same-user application instances serialize through a named mutex; an elevated relaunch waits for the prior process to close.
+
+## Bounded scanning and indexing
+
+`IScanEngine` emits metadata batches capped by entry count and serialized-size estimates. IPC frames are limited to 2 MiB. Directory scanning uses 64 KiB native metadata buffers and a depth-first iterator stack capped at 512 directories. Provider fallback uses `FindFirstFileExW`. Hidden/system entries are included; reparse children and recall/offline placeholders are not traversed or hashed.
+
+The raw engine queries NTFS geometry/version and bootstraps `$MFT` extents through identity-validated record IOCTLs. It streams extents, applies sector fixups, validates attributes/runlists/references, and resolves extension records and hard links. Directory ancestry is capped at 250,000 records / estimated 64 MiB; path cache at 10,000 entries / estimated 32 MiB; nonresident attribute lists at 16 MiB; accumulated extension metadata at 32 MiB. Unsupported structures or exceeded budgets discard raw entries for that root and restart native directory scanning. Root sequence numbers and ancestry references are validated.
+
+SQLite uses WAL, batched transactions, 32 MiB connection caches, file-backed temporary work, and per-snapshot indexes constructed after ingestion. Bounded index statistics prevent the planner choosing repeated full-snapshot scans for parent aggregates. Root, folder, and extension totals are materialized. Known hard-linked identities are refreshed once through the worker and canonicalized across names, because directory-index timestamps can lag writes through another alias. This avoids retaining all identities in memory or opening every scanned file individually.
+
+Views query pages of 250 files/duplicates, or bounded folder/type rankings. Filter refreshes carry a revision so late reads cannot replace newer selections. CSV/JSON exports stream the entire inventory. Snapshots are observations of a changing filesystem, not atomic backups; denied access, interruptions, fallback diagnostics, and stale results remain visible.
+
+## Duplicates and cleanup
+
+Duplicate work lives in SQLite: collapse overlapping history and known identities, filter by size, compare samples, then compute full main-stream hashes. Samples and names never establish equivalence. Hash reuse checks identity/change metadata; unknown change metadata prevents caching.
+
+Cleanup is independently reviewed and verified. Locked read handles revalidate the selected target and keeper, byte-compare main data and named streams, and retain at least one independent keeper. Protected locations/reparse parents/placeholders are blocked. Handle-based same-volume renames use a durable intent journal. Restore never overwrites. Interrupted journals reconcile by identity or require review. Windows Recycle Bin requests preserve OS dialogs and never silently choose permanent deletion. Potential savings, reported allocation, and actual free-space change are distinct concepts.
+
+`winsqlite3.dll` is serviced by Windows. Using it avoids redistributing a separately vulnerable SQLite native binary. The pinned managed provider and upstream notices are included in release documentation.

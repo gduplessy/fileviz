@@ -11,7 +11,8 @@ Claims below distinguish automated fixtures, a rendered live desktop, and unveri
 | Desktop | Visible WPF scan and SHA-256 duplicate smoke: 303 files, 40 MiB, 2 duplicate rows, no errors; reviewed rendered screenshot | Keyboard/screen-reader acceptance, DPI and dark-theme checks across multiple displays |
 | Duplicates | Name candidates have no savings; samples never establish equivalence; staged full hashes, overlapping history, hard-link alias handling, changed metadata/identity rejection | Full multi-drive provider matrix and hash cache performance |
 | Cleanup | Fresh byte mismatches, changed metadata, differing ADS, protected paths, quarantine and no-overwrite restore, journal reconciliation | Recycle Bin unavailable/oversized-file paths, interrupted OS recycle request, network and cross-user UAC provider cases |
-| Performance | Million-entry synthetic index budget/query pass; ten-million-entry run recorded separately | Combined UI/worker real-volume budgets; raw 2x target currently unmet |
-| Packages | Windows self-contained ZIP/installer validation recorded in the release report | Authenticode signing; ARM64; other Windows versions |
+| Performance | One- and ten-million-entry synthetic index memory/query targets passed | Combined UI/worker real-volume budgets; raw 2x target currently unmet |
+| Packages | Self-contained ZIP and per-user installer: 303 fixture files, 2 duplicate rows, zero errors with SDK paths removed; install/uninstall exit 0; checksums verified | Authenticode signing; ARM64; other Windows versions |
 
 Only disposable fixtures are used for cleanup tests. User files are never automatically selected or modified during validation. Structural raw failures discard raw entries and restart directory enumeration; incomplete coverage remains visible. Quarantine and Recycle Bin requests retain or dispose data separately from potential-savings estimates.
+Machine-readable reports live in [evidence](evidence/). Package validation is reproducible with scripts/validate-package.ps1; it uses only workspace-owned disposable files and refuses to overwrite an existing user installation.
