@@ -8,7 +8,7 @@
     <AnalysisLevel>latest</AnalysisLevel>
     <Deterministic>true</Deterministic>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
-    <Version>0.2.1</Version>
+    <Version>0.2.2</Version>
     <Authors>FileViz contributors</Authors>
     <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/gduplessy/fileviz</RepositoryUrl>

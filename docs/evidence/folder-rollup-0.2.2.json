@@ -1,0 +1,205 @@
+{
+  "MeasuredDate": "2026-10-05",
+  "Conditions": "Single runs on the documented SATA SSD host, under shared load; synthetic metadata only.",
+  "Original8000": {
+    "Kind": "Synthetic branching folder rollup (no filesystem reads)",
+    "Branches": 8000,
+    "Folders": 16000,
+    "Files": 8000,
+    "IngestSeconds": 1.3218177,
+    "FinalizeSeconds": 55.1871385,
+    "Stages": [
+      {
+        "Stage": "Starting",
+        "Seconds": 0.0063263
+      },
+      {
+        "Stage": "Preparing file views (1/7): parent",
+        "Seconds": 0.13975869999999999
+      },
+      {
+        "Stage": "Preparing file views (2/7): parent allocated",
+        "Seconds": 0.1111171
+      },
+      {
+        "Stage": "Preparing file views (3/7): size",
+        "Seconds": 0.11350470000000001
+      },
+      {
+        "Stage": "Preparing file views (4/7): allocated",
+        "Seconds": 0.12434479999999998
+      },
+      {
+        "Stage": "Preparing file views (5/7): identity",
+        "Seconds": 0.09076540000000005
+      },
+      {
+        "Stage": "Preparing file views (6/7): name",
+        "Seconds": 0.09929149999999998
+      },
+      {
+        "Stage": "Preparing file views (7/7): extension",
+        "Seconds": 0.07754360000000005
+      },
+      {
+        "Stage": "Optimizing file queries",
+        "Seconds": 0.01707499999999995
+      },
+      {
+        "Stage": "Calculating folder sizes",
+        "Seconds": 31.385370500000004
+      },
+      {
+        "Stage": "Calculating file types and ages",
+        "Seconds": 20.039426899999995
+      },
+      {
+        "Stage": "Summarizing drive usage",
+        "Seconds": 0.2351725999999985
+      },
+      {
+        "Stage": "Saving snapshot",
+        "Seconds": 2.501764300000005
+      }
+    ],
+    "Runtime": "10.0.12",
+    "OS": "Microsoft Windows NT 10.0.26100.0",
+    "CpuCount": 12,
+    "PeakWorkingSet": 95342592,
+    "DatabaseBytes": 21082112
+  },
+  "Patched8000": {
+    "Kind": "Synthetic branching folder rollup (no filesystem reads)",
+    "Branches": 8000,
+    "Folders": 16000,
+    "Files": 8000,
+    "IngestSeconds": 4.3794348,
+    "FinalizeSeconds": 5.6630576,
+    "Stages": [
+      {
+        "Stage": "Starting",
+        "Seconds": 0.015691
+      },
+      {
+        "Stage": "Preparing file views (1/7): parent",
+        "Seconds": 0.1051577
+      },
+      {
+        "Stage": "Preparing file views (2/7): parent allocated",
+        "Seconds": 0.11596889999999999
+      },
+      {
+        "Stage": "Preparing file views (3/7): size",
+        "Seconds": 0.09187979999999998
+      },
+      {
+        "Stage": "Preparing file views (4/7): allocated",
+        "Seconds": 0.08293860000000003
+      },
+      {
+        "Stage": "Preparing file views (5/7): identity",
+        "Seconds": 0.06935859999999999
+      },
+      {
+        "Stage": "Preparing file views (6/7): name",
+        "Seconds": 0.08788259999999998
+      },
+      {
+        "Stage": "Preparing file views (7/7): extension",
+        "Seconds": 0.13180040000000004
+      },
+      {
+        "Stage": "Optimizing file queries",
+        "Seconds": 0.026876800000000034
+      },
+      {
+        "Stage": "Calculating folder sizes",
+        "Seconds": 1.3842565999999998
+      },
+      {
+        "Stage": "Calculating file types and ages",
+        "Seconds": 1.4851337
+      },
+      {
+        "Stage": "Summarizing drive usage",
+        "Seconds": 0.25205560000000027
+      },
+      {
+        "Stage": "Saving snapshot",
+        "Seconds": 1.7154312000000003
+      }
+    ],
+    "Runtime": "10.0.12",
+    "OS": "Microsoft Windows NT 10.0.26100.0",
+    "CpuCount": 12,
+    "PeakWorkingSet": 95731712,
+    "DatabaseBytes": 21082112
+  },
+  "Patched100000": {
+    "Kind": "Synthetic branching folder rollup (no filesystem reads)",
+    "Branches": 100000,
+    "Folders": 200000,
+    "Files": 100000,
+    "IngestSeconds": 7.6626934,
+    "FinalizeSeconds": 33.2940819,
+    "Stages": [
+      {
+        "Stage": "Starting",
+        "Seconds": 0.0018304
+      },
+      {
+        "Stage": "Preparing file views (1/7): parent",
+        "Seconds": 1.9951396
+      },
+      {
+        "Stage": "Preparing file views (2/7): parent allocated",
+        "Seconds": 0.9185684999999999
+      },
+      {
+        "Stage": "Preparing file views (3/7): size",
+        "Seconds": 2.3484591
+      },
+      {
+        "Stage": "Preparing file views (4/7): allocated",
+        "Seconds": 1.0188699000000003
+      },
+      {
+        "Stage": "Preparing file views (5/7): identity",
+        "Seconds": 1.6864295
+      },
+      {
+        "Stage": "Preparing file views (6/7): name",
+        "Seconds": 1.0720766
+      },
+      {
+        "Stage": "Preparing file views (7/7): extension",
+        "Seconds": 1.0429846000000005
+      },
+      {
+        "Stage": "Optimizing file queries",
+        "Seconds": 1.117091199999999
+      },
+      {
+        "Stage": "Calculating folder sizes",
+        "Seconds": 11.091904699999999
+      },
+      {
+        "Stage": "Calculating file types and ages",
+        "Seconds": 7.879984200000003
+      },
+      {
+        "Stage": "Summarizing drive usage",
+        "Seconds": 2.8200854
+      },
+      {
+        "Stage": "Saving snapshot",
+        "Seconds": 0.02074599999999549
+      }
+    ],
+    "Runtime": "10.0.12",
+    "OS": "Microsoft Windows NT 10.0.26100.0",
+    "CpuCount": 12,
+    "PeakWorkingSet": 129429504,
+    "DatabaseBytes": 266514432
+  }
+}

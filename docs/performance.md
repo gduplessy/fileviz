@@ -57,3 +57,19 @@ dotnet run --project tools/FileViz.Benchmarks -c Release -- --index 10000000 art
 ```
 
 Use a new output directory. Reports are JSON; databases and test images are ignored by Git. The test suite verifies actual local worker termination within two seconds. Disconnected SMB/provider stalls, elevated cancellation timing, cloud placeholders, concurrent live changes, and the complete reference-volume matrix remain unverified; see [validation](validation.md).
+
+## Branching directory finalization (0.2.2)
+
+A real-volume CPU trace exposed repeated scans in folder rollup and file-type/age aggregation. Correlated lookups scanned an unindexed grouped temporary result for each parent, producing quadratic work on wide nested trees. Direct folder totals also repeated inventory queries. Version 0.2.2 builds indexed temporary aggregates, groups direct children once, and uses keyed lookups for each depth. The original million-entry fixture placed only 1,000 folders directly beneath one root and did not expose this shape.
+
+Measured on the machine above on 2026-10-05. The branching fixture creates a root, a branch and leaf directory per branch, and one 17-byte file per leaf, entirely as SQLite metadata.
+
+| Dataset | Version | Finalize | Folder sizes | Type/age totals | Peak working set |
+| --- | --- | --- | --- | --- | --- |
+| 8,000 files / 16,000 folders | Original | 55.19 s | 31.39 s | 20.04 s | 90.93 MiB |
+| 8,000 files / 16,000 folders | Patched | 5.66 s | 1.38 s | 1.49 s | 91.30 MiB |
+| 100,000 files / 200,000 folders | Patched | 33.29 s | 11.09 s | 7.88 s | 123.43 MiB |
+
+These are single runs under shared load, not full-drive scan speed guarantees. The small branching fixture improved 9.7x overall; the larger fixture validates a directory count that the old shallow benchmark missed. Index construction and filesystem access still depend on inventory size, storage, permissions, and provider behavior. [Machine-readable evidence](evidence/folder-rollup-0.2.2.json).
+
+Reproduce with `dotnet run --project tools/FileViz.Benchmarks -c Release -- --tree 100000 artifacts/benchmarks/new-tree`. To reproduce the original behavior, use the original 0.2.1 Data assembly with the same generator. Finalization cancellation now interrupts an executing SQLite statement instead of waiting to finish partial views; interrupted metadata can be rebuilt later without rescanning.

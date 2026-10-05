@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.2 — preview
+
+- Replace repeated folder and composition scans with indexed temporary aggregates. Wide, nested directory trees no longer trigger quadratic finalization work.
+- Interrupt executing SQLite finalization statements when cancelled; retain saved metadata for a later rebuild.
+- Add **Rebuild saved views** for interrupted, cancelled, or failed snapshots. Rebuild from persisted inventory without traversing folders, while preserving the original coverage state.
+- Add a local `--database PATH` override and `--rebuild-snapshot ID` for recovery, plus a reproducible branching-tree benchmark.
+- Verify branching totals, hard-link allocation, unknown allocation, empty folders, repeat rebuilds, native SQL interruption, and desktop recovery without rescanning.
+
 ## 0.2.1 — preview
 
 - Show hard-link discovery and refresh, all seven query-index steps, folder/type/age totals, and snapshot saving while finalizing large scans. Clear stale MFT progress when directory fallback begins.
