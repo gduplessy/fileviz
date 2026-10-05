@@ -1,0 +1,77 @@
+<Window x:Class="FileViz.App.Views.ReviewWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ Title="Review quarantine" Width="860" Height="620" MinWidth="640" MinHeight="420" WindowStartupLocation="CenterOwner" ShowInTaskbar="False" FontFamily="{StaticResource TextFont}">
+ <Window.Resources>
+  <DataTemplate x:Key="CheckCell">
+   <TextBlock x:Name="Glyph" Style="{StaticResource Icon}" HorizontalAlignment="Center" Text="&#xE916;" Foreground="{DynamicResource TextFillColorTertiaryBrush}" AutomationProperties.Name="{Binding}"/>
+   <DataTemplate.Triggers>
+    <DataTrigger Binding="{Binding}" Value="Passed"><Setter TargetName="Glyph" Property="Text" Value="&#xE73E;"/><Setter TargetName="Glyph" Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}"/></DataTrigger>
+    <DataTrigger Binding="{Binding}" Value="Failed"><Setter TargetName="Glyph" Property="Text" Value="&#xE711;"/><Setter TargetName="Glyph" Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}"/></DataTrigger>
+    <DataTrigger Binding="{Binding}" Value="NotChecked"><Setter TargetName="Glyph" Property="Text" Value="&#xE738;"/><Setter TargetName="Glyph" Property="ToolTip" Value="Not checked: no keeper to compare"/></DataTrigger>
+   </DataTemplate.Triggers>
+  </DataTemplate>
+ </Window.Resources>
+ <DockPanel>
+  <Border DockPanel.Dock="Bottom" Background="{DynamicResource CardBackgroundFillColorSecondaryBrush}" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" Padding="24,16">
+   <DockPanel>
+    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+     <Button Content="Cancel" IsCancel="True" MinWidth="120" Margin="0,0,8,0" Click="Cancel_Click"/>
+     <Button Style="{StaticResource AccentButtonStyle}" Content="{Binding ConfirmLabel}" IsEnabled="{Binding CanConfirm}" MinWidth="180" Click="Confirm_Click"/>
+    </StackPanel>
+    <TextBlock Text="Each file is checked again while it moves; anything that changed is skipped." Style="{StaticResource CaptionText}" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,16,0"/>
+   </DockPanel>
+  </Border>
+  <Grid Margin="24,20,24,16">
+   <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+   <StackPanel Margin="0,0,0,16">
+    <TextBlock Text="{Binding Title}" Style="{StaticResource SubtitleText}"/>
+    <TextBlock Text="FileViz checked each file against the snapshot and, for duplicates, its keeper: identity, size and timestamps, bytes, and named streams." Style="{StaticResource BodyText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,4,0,0"/>
+   </StackPanel>
+   <UniformGrid Grid.Row="1" Columns="3" Margin="0,0,0,16">
+    <Border CornerRadius="8" Padding="14,10" Margin="0,0,8,0" Background="{DynamicResource SystemFillColorSuccessBackgroundBrush}">
+     <StackPanel><TextBlock Text="Ready" Style="{StaticResource CaptionText}" FontWeight="SemiBold" Foreground="{DynamicResource SystemFillColorSuccessBrush}"/><TextBlock Text="{Binding ReadyText}" Style="{StaticResource MetricValue}"/></StackPanel>
+    </Border>
+    <Border CornerRadius="8" Padding="14,10" Margin="4,0" Background="{DynamicResource SystemFillColorCriticalBackgroundBrush}">
+     <StackPanel><TextBlock Text="Blocked" Style="{StaticResource CaptionText}" FontWeight="SemiBold" Foreground="{DynamicResource SystemFillColorCriticalBrush}"/><TextBlock Text="{Binding BlockedText}" Style="{StaticResource MetricValue}"/></StackPanel>
+    </Border>
+    <Border CornerRadius="8" Padding="14,10" Margin="8,0,0,0" Background="{DynamicResource SystemFillColorNeutralBackgroundBrush}">
+     <StackPanel><TextBlock Text="Disk space freed now" Style="{StaticResource CaptionText}" FontWeight="SemiBold"/><TextBlock Style="{StaticResource MetricValue}"><Run Text="0 B"/><Run Text=" until disposed" FontSize="12" FontWeight="Normal" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/></TextBlock></StackPanel>
+    </Border>
+   </UniformGrid>
+   <Border Grid.Row="2" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6">
+    <DataGrid Style="{StaticResource ListGrid}" ItemsSource="{Binding Items}" SelectionMode="Single" AutomationProperties.Name="Files to review">
+     <DataGrid.Columns>
+      <DataGridTemplateColumn Header="File" Width="*">
+       <DataGridTemplateColumn.CellTemplate><DataTemplate>
+        <StackPanel Margin="0,4">
+         <TextBlock Text="{Binding Path}" Style="{StaticResource MonoText}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Path}"/>
+         <TextBlock Text="{Binding Error}" Style="{StaticResource CaptionText}" Foreground="{DynamicResource SystemFillColorCriticalBrush}" TextWrapping="Wrap" Visibility="{Binding Blocked, Converter={StaticResource Visible}}"/>
+        </StackPanel>
+       </DataTemplate></DataGridTemplateColumn.CellTemplate>
+      </DataGridTemplateColumn>
+      <DataGridTextColumn Header="Size" Binding="{Binding Size}" Width="80"/>
+      <DataGridTemplateColumn Header="Identity" Width="76"><DataGridTemplateColumn.CellTemplate><DataTemplate><ContentPresenter Content="{Binding Identity}" ContentTemplate="{StaticResource CheckCell}"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+      <DataGridTemplateColumn Header="Metadata" Width="88"><DataGridTemplateColumn.CellTemplate><DataTemplate><ContentPresenter Content="{Binding Metadata}" ContentTemplate="{StaticResource CheckCell}"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+      <DataGridTemplateColumn Header="Bytes" Width="60"><DataGridTemplateColumn.CellTemplate><DataTemplate><ContentPresenter Content="{Binding Bytes}" ContentTemplate="{StaticResource CheckCell}"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+      <DataGridTemplateColumn Header="Streams" Width="80"><DataGridTemplateColumn.CellTemplate><DataTemplate><ContentPresenter Content="{Binding Streams}" ContentTemplate="{StaticResource CheckCell}"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+      <DataGridTemplateColumn Header="Status" Width="90">
+       <DataGridTemplateColumn.CellTemplate><DataTemplate>
+        <Border x:Name="Pill" Style="{StaticResource Badge}" BorderThickness="0"><TextBlock x:Name="Label" Text="{Binding Status}" Style="{StaticResource BadgeText}"/></Border>
+        <DataTemplate.Triggers>
+         <DataTrigger Binding="{Binding Status}" Value="Ready"><Setter TargetName="Pill" Property="Background" Value="{DynamicResource SystemFillColorSuccessBackgroundBrush}"/><Setter TargetName="Label" Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}"/></DataTrigger>
+         <DataTrigger Binding="{Binding Status}" Value="Blocked"><Setter TargetName="Pill" Property="Background" Value="{DynamicResource SystemFillColorCriticalBackgroundBrush}"/><Setter TargetName="Label" Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}"/></DataTrigger>
+        </DataTemplate.Triggers>
+       </DataTemplate></DataGridTemplateColumn.CellTemplate>
+      </DataGridTemplateColumn>
+     </DataGrid.Columns>
+    </DataGrid>
+   </Border>
+   <ProgressBar Grid.Row="3" IsIndeterminate="True" Height="3" Margin="0,8,0,0" Visibility="{Binding Checking, Converter={StaticResource Visible}}" AutomationProperties.Name="Checking files"/>
+   <Border Grid.Row="4" Style="{StaticResource Callout}" Margin="0,12,0,0">
+    <StackPanel Orientation="Horizontal">
+     <TextBlock Style="{StaticResource Icon}" Text="&#xE946;" Margin="0,0,10,0" VerticalAlignment="Top" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"/>
+     <TextBlock Style="{StaticResource BodyText}" FontSize="13" MaxWidth="740"><Run Text="Each file moves into a hidden "/><Run Text=".FileViz-Quarantine" FontFamily="{StaticResource MonoFont}"/><Run Text=" folder beside its parent, on the same volume. Every move is journaled. Restore never overwrites an existing file."/></TextBlock>
+    </StackPanel>
+   </Border>
+  </Grid>
+ </DockPanel>
+</Window>

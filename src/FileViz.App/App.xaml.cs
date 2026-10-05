@@ -58,13 +58,14 @@ public partial class App : Application
                 window.Model.Home.Drives.Add(new FileViz.App.ViewModels.DriveRow(Path.GetFullPath(e.Args[1]), "Fixture · local sample data", "Disposable 40 MiB validation fixture", true));
                 // Mica is a DWM backdrop and does not appear in RenderTargetBitmap, so captures use the solid base color.
                 window.SetResourceReference(Control.BackgroundProperty, "SolidBackgroundFillColorBaseBrush");
-                async Task Capture(ThemeMode theme, string file)
+                async Task Capture(ThemeMode theme, string file, Window? target = null)
                 {
+                    target ??= window;
                     SetTheme(theme);
                     await Task.Delay(500);
-                    window.UpdateLayout();
-                    var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap((int)((FrameworkElement)window.Content).ActualWidth, (int)((FrameworkElement)window.Content).ActualHeight, 96, 96, PixelFormats.Pbgra32);
-                    bitmap.Render(window);
+                    target.UpdateLayout();
+                    var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap((int)((FrameworkElement)target.Content).ActualWidth, (int)((FrameworkElement)target.Content).ActualHeight, 96, 96, PixelFormats.Pbgra32);
+                    bitmap.Render(target);
                     var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
                     encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
                     using var output = File.Create(Path.Combine(Path.GetFullPath(e.Args[2]), file));
@@ -96,6 +97,21 @@ public partial class App : Application
                             window.Model.Explorer.ColorByAge = false;
                         }
                     }
+                if (sections)
+                {
+                    // The review window prechecks the fixture's duplicate pair; shown non-modally so it can be captured.
+                    window.Model.SelectedNav = window.Model.NavItems[2];
+                    window.Model.Duplicates.SelectAllCommand.Execute(null);
+                    await Capture(ThemeMode.Light, "section-duplicates-selected.png");
+                    var review = new FileViz.App.Views.ReviewWindow(new(window.Model.Duplicates.BuildSelections() ?? [])) { Owner = window };
+                    review.SetResourceReference(Control.BackgroundProperty, "SolidBackgroundFillColorBaseBrush");
+                    review.Show();
+                    await Task.Delay(1500);
+                    await Capture(ThemeMode.Light, "dialog-review.png", review);
+                    await Capture(ThemeMode.Dark, "dialog-review-dark.png", review);
+                    review.Close();
+                    window.Model.Duplicates.ClearCommand.Execute(null);
+                }
                 File.WriteAllText(Path.Combine(Path.GetFullPath(e.Args[2]), "smoke.json"), System.Text.Json.JsonSerializer.Serialize(new
                 {
                     window.Model.Session.Status,

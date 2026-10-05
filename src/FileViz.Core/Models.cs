@@ -44,6 +44,8 @@ public interface IScanEngine
 }
 public static class Format
 {
+    /// <summary>"1 file", "2 files".</summary>
+    public static string Count(long count, string singular, string? plural = null) => $"{count:N0} {(count == 1 ? singular : plural ?? singular + "s")}";
     public static string Bytes(long value)
     {
         string[] units = ["B", "KiB", "MiB", "GiB", "TiB", "PiB"];
