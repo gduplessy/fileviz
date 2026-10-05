@@ -116,6 +116,7 @@ public sealed partial class IndexStore : IDisposable
         RebuildFolders(snapshot, progress);
         progress?.Invoke("Calculating file types and ages");
         BuildComposition(snapshot);
+        EnsureFolderNavigationIndexes(snapshot, progress);
         progress?.Invoke("Summarizing drive usage");
         var summary = GetSummaryRaw(snapshot);
         CacheSummaries(snapshot, summary);
@@ -312,7 +313,11 @@ public sealed partial class IndexStore : IDisposable
     }
     public List<Breakdown> LargestFolders(long snapshot, bool allocated = false, string? parent = null, string? root = null)
     {
-        using var command = Command($"SELECT path,{(allocated ? "allocated" : "logical")},files FROM folders WHERE snapshot=$s AND ($root IS NULL OR path=$root OR path LIKE $prefix ESCAPE '!') {(parent == null ? "" : "AND parent=$parent AND path<>parent")} ORDER BY {(allocated ? "allocated" : "logical")} DESC LIMIT 100;", ("$s", snapshot), ("$parent", parent), ("$root", root), ("$prefix", root == null ? null : EscapeLike(root.TrimEnd('\\') + "\\") + "%"));
+        EnsureFolderNavigationIndexes(snapshot);
+        var savedRoot = root == null ? null : (JsonSerializer.Deserialize<string[]>((string)Scalar("SELECT roots FROM snapshots WHERE id=$s;", ("$s", snapshot))!) ?? [])
+            .FirstOrDefault(x => x.Equals(root, StringComparison.OrdinalIgnoreCase));
+        var scope = root == null ? "" : savedRoot != null ? "AND root=$root" : "AND (path=$root OR path LIKE $prefix ESCAPE '!')";
+        using var command = Command($"SELECT path,{(allocated ? "allocated" : "logical")},files FROM folders WHERE snapshot=$s {scope} {(parent == null ? "" : "AND parent=$parent AND path<>parent")} ORDER BY {(allocated ? "allocated" : "logical")} DESC LIMIT 100;", ("$s", snapshot), ("$parent", parent), ("$root", savedRoot ?? root), ("$prefix", root == null ? null : EscapeLike(root.TrimEnd('\\') + "\\") + "%"));
         using var reader = command.ExecuteReader();
         var result = new List<Breakdown>();
         while (reader.Read())

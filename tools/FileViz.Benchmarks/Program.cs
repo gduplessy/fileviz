@@ -5,9 +5,9 @@ using FileViz.Data;
 using FileViz.Windows;
 using FileViz.Windows.Ntfs;
 
-if (args.Length < 3 || args[0] is not ("--index" or "--scan" or "--parity" or "--aliases" or "--tree" or "--rebuild"))
+if (args.Length < 3 || args[0] is not ("--index" or "--scan" or "--parity" or "--aliases" or "--tree" or "--rebuild" or "--views"))
 {
-    Console.Error.WriteLine("Usage: --index COUNT OUTPUT | --scan ROOT OUTPUT [mft|directory] | --parity ROOT OUTPUT | --aliases GROUPS OUTPUT [--unbatched] | --tree BRANCHES OUTPUT | --rebuild DATABASE OUTPUT");
+    Console.Error.WriteLine("Usage: --index COUNT OUTPUT | --scan ROOT OUTPUT [mft|directory] | --parity ROOT OUTPUT | --aliases GROUPS OUTPUT [--unbatched] | --tree BRANCHES OUTPUT | --rebuild DATABASE OUTPUT | --views DATABASE OUTPUT");
     return 2;
 }
 var output = Path.GetFullPath(args[2]);
@@ -19,7 +19,41 @@ using var sample = new Timer(_ => { try { process.Refresh(); Interlocked.Exchang
 object result;
 try
 {
-    if (args[0] == "--rebuild")
+    if (args[0] == "--views")
+    {
+        var database = Path.GetFullPath(args[1]);
+        if (!File.Exists(database)) throw new FileNotFoundException("Saved inventory must already exist.", database);
+        using var store = new IndexStore(database);
+        var saved = store.Snapshots().FirstOrDefault() ?? throw new InvalidDataException("No saved snapshot.");
+        if (!store.HasComposition(saved.Id) || saved.State == "Scanning") throw new InvalidOperationException("Finish saved views before measuring navigation.");
+        store.EnsureFolderNavigationIndexes(saved.Id, Console.WriteLine);
+        var preparation = timer.Elapsed.TotalSeconds;
+        var root = JsonSerializer.Deserialize<string[]>(saved.Roots)!.First();
+        var timings = new List<object>();
+        for (var i = 0; i < 5; i++)
+        {
+            var query = Stopwatch.StartNew();
+            var files = store.Query(saved.Id, new(Root: root));
+            var filesMs = query.Elapsed.TotalMilliseconds;
+            query.Restart();
+            store.LargestFolders(saved.Id, root: root);
+            var logicalFoldersMs = query.Elapsed.TotalMilliseconds;
+            query.Restart();
+            store.LargestFolders(saved.Id, allocated: true, root: root);
+            var allocatedFoldersMs = query.Elapsed.TotalMilliseconds;
+            query.Restart();
+            var map = store.SpaceMap(saved.Id, root, false);
+            var logicalMs = query.Elapsed.TotalMilliseconds;
+            query.Restart();
+            var allocated = store.SpaceMap(saved.Id, root, true);
+            timings.Add(new { Iteration = i + 1, FilesMs = filesMs, LogicalMapMs = logicalMs, AllocatedMapMs = query.Elapsed.TotalMilliseconds,
+                LogicalFolderRankingMs = logicalFoldersMs, AllocatedFolderRankingMs = allocatedFoldersMs,
+                FileRows = files.Count, MapRows = map.Count, AllocatedMapRows = allocated.Count });
+        }
+        result = new { Kind = "Saved inventory primary views without filesystem scanning", PreparationSeconds = preparation, Timings = timings,
+            Summary = store.GetSummary(saved.Id), PeakWorkingSet = peak, ElapsedSeconds = timer.Elapsed.TotalSeconds };
+    }
+    else if (args[0] == "--rebuild")
     {
         var database = Path.GetFullPath(args[1]);
         if (!File.Exists(database)) throw new FileNotFoundException("Saved inventory must already exist.", database);

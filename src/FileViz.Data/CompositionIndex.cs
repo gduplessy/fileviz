@@ -32,6 +32,18 @@ public sealed partial class IndexStore
     /// <summary>Snapshot start time in UTC ticks: the reference point for age buckets.</summary>
     public long StartedTicks(long snapshot) => Scalar("SELECT started FROM snapshots WHERE id=$s;", ("$s", snapshot)) is string started ? DateTime.Parse(started, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind).ToUniversalTime().Ticks : DateTime.UtcNow.Ticks;
     public bool HasComposition(long snapshot) => Convert.ToInt64(Scalar("SELECT composition FROM snapshots WHERE id=$s;", ("$s", snapshot)) ?? 0L, CultureInfo.InvariantCulture) == 1;
+    /// <summary>Builds child-ranking indexes after aggregation; also upgrades saved snapshots on first navigation.</summary>
+    public void EnsureFolderNavigationIndexes(long snapshot, Action<string>? progress = null)
+    {
+        if (snapshot <= 0) throw new ArgumentOutOfRangeException(nameof(snapshot));
+        foreach (var size in new[] { "logical", "allocated" })
+        {
+            progress?.Invoke($"Preparing folder navigation: {size}");
+            Execute($"CREATE INDEX IF NOT EXISTS folder_{snapshot}_parent_{size} ON folders(parent,{size} DESC,path) WHERE snapshot={snapshot};");
+        }
+        progress?.Invoke("Preparing folder navigation: allocated ranking");
+        Execute($"CREATE INDEX IF NOT EXISTS folder_{snapshot}_root_allocated ON folders(root,allocated DESC,path) WHERE snapshot={snapshot};");
+    }
     /// <summary>Runs after <see cref="RebuildFolders"/>: direct totals per parent, then a depth-ordered rollup like the size totals.</summary>
     private void BuildComposition(long snapshot)
     {
@@ -90,6 +102,7 @@ public sealed partial class IndexStore
     /// </summary>
     public List<MapNode> SpaceMap(long snapshot, string parent, bool allocated, int folderLimit = 24, int fileLimit = 40, int nestedFolders = 12, int nestedLimit = 8)
     {
+        EnsureFolderNavigationIndexes(snapshot);
         var reference = StartedTicks(snapshot);
         var composition = HasComposition(snapshot);
         List<MapNode> Level(string folder, int folders, int files)
