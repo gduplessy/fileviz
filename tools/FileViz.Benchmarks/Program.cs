@@ -5,9 +5,9 @@ using FileViz.Data;
 using FileViz.Windows;
 using FileViz.Windows.Ntfs;
 
-if (args.Length < 3 || args[0] is not ("--index" or "--scan" or "--parity" or "--aliases" or "--tree"))
+if (args.Length < 3 || args[0] is not ("--index" or "--scan" or "--parity" or "--aliases" or "--tree" or "--rebuild"))
 {
-    Console.Error.WriteLine("Usage: --index COUNT OUTPUT | --scan ROOT OUTPUT [mft|directory] | --parity ROOT OUTPUT | --aliases GROUPS OUTPUT [--unbatched] | --tree BRANCHES OUTPUT");
+    Console.Error.WriteLine("Usage: --index COUNT OUTPUT | --scan ROOT OUTPUT [mft|directory] | --parity ROOT OUTPUT | --aliases GROUPS OUTPUT [--unbatched] | --tree BRANCHES OUTPUT | --rebuild DATABASE OUTPUT");
     return 2;
 }
 var output = Path.GetFullPath(args[2]);
@@ -19,7 +19,28 @@ using var sample = new Timer(_ => { try { process.Refresh(); Interlocked.Exchang
 object result;
 try
 {
-    if (args[0] == "--tree")
+    if (args[0] == "--rebuild")
+    {
+        var database = Path.GetFullPath(args[1]);
+        if (!File.Exists(database)) throw new FileNotFoundException("Saved inventory must already exist.", database);
+        using var store = new IndexStore(database);
+        store.RecoverInterrupted();
+        var saved = store.Snapshots().FirstOrDefault() ?? throw new InvalidDataException("No saved snapshot.");
+        using var cancellation = new CancellationTokenSource();
+        Console.CancelKeyPress += (_, e) => { e.Cancel = true; cancellation.Cancel(); };
+        var phases = new List<object>();
+        var previous = timer.Elapsed.TotalSeconds;
+        store.RebuildViews(saved.Id, detail =>
+        {
+            var now = timer.Elapsed.TotalSeconds;
+            phases.Add(new { Phase = detail, ElapsedSeconds = now, PreviousPhaseSeconds = now - previous });
+            previous = now;
+            Console.WriteLine($"{now:F1}s {detail}");
+        }, cancellation.Token);
+        result = new { Kind = "Saved inventory recovery without filesystem scanning", Snapshot = saved.Id, CoverageState = saved.State,
+            Summary = store.GetSummary(saved.Id), Phases = phases, PeakWorkingSet = peak, ElapsedSeconds = timer.Elapsed.TotalSeconds };
+    }
+    else if (args[0] == "--tree")
         result = TreeBenchmark.Run(int.Parse(args[1]), output);
     else if (args[0] == "--aliases")
         result = AliasBenchmark.Run(int.Parse(args[1]), output, args.Contains("--unbatched"));

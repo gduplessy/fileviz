@@ -60,3 +60,11 @@ Keyboard: F5 scan, Esc cancel, Alt+Up up one level, Ctrl+E export, Ctrl+F search
 ## Privacy and storage
 
 Snapshots, settings, and journals live in `%LOCALAPPDATA%/FileViz/index.db`. Reports contain paths and metadata: review them before sharing. No telemetry, drivers, automatic deletion, automatic updates, or remote storage are used. Removing a snapshot database does not restore quarantine files; retain the journal while cleanup actions remain outstanding.
+
+## Recover an interrupted snapshot
+
+Select an interrupted, cancelled, or failed snapshot in Home's history and choose **Rebuild saved views**. This computes indexes and totals from its saved entries; it does not enumerate folders, refresh file metadata, or establish complete coverage. The snapshot retains its previous coverage state. Cancel can interrupt an executing finalization query; a later rebuild starts the views again without duplicating entries.
+
+For recovery from a local database copy, launch `FileViz.exe --database "C:\Recovery\index.db" --rebuild-snapshot 1`. Keep the original database untouched and copy its matching `index.db-wal` and `index.db-shm` together while FileViz is closed; an online database requires SQLite's backup API instead. Close other FileViz instances before launching. The override writes only to the selected database; it does not migrate it to the default location. File actions always refer to the original scanned paths, so retain the incomplete/stale coverage labels when reviewing results.
+
+The diagnostic benchmark tool also supports `--rebuild DATABASE OUTPUT` for the newest saved interrupted snapshot. It modifies the selected database, records stage timings, and performs no filesystem scan. Use a recovery copy and an empty report directory.
