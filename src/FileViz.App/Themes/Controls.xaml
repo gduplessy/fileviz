@@ -7,6 +7,8 @@
  <views:StateKindConverter x:Key="StateKind"/>
  <views:NegateConverter x:Key="Negate"/>
  <views:BytesConverter x:Key="Bytes"/>
+ <views:SignedBytesConverter x:Key="SignedBytes"/>
+ <views:PositiveVisibilityConverter x:Key="VisibleIfPositive"/>
 
  <!-- Typography -->
  <Style x:Key="TitleText" TargetType="TextBlock"><Setter Property="FontFamily" Value="{StaticResource DisplayFont}"/><Setter Property="FontSize" Value="28"/><Setter Property="LineHeight" Value="36"/><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}"/></Style>

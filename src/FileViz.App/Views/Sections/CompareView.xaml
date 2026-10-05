@@ -1,30 +1,111 @@
 <UserControl x:Class="FileViz.App.Views.Sections.CompareView" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+ <UserControl.Resources>
+  <Style x:Key="Total" TargetType="TextBlock" BasedOn="{StaticResource MetricValue}"><Setter Property="FontFamily" Value="{StaticResource DisplayFont}"/><Setter Property="FontSize" Value="24"/></Style>
+ </UserControl.Resources>
  <Grid Margin="{StaticResource PagePadding}">
-  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition/></Grid.RowDefinitions>
-  <TextBlock Text="Compare" Style="{StaticResource TitleText}" Margin="0,0,0,16"/>
-  <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,12" IsEnabled="{Binding Session.CanInteract}">
-   <TextBlock Text="Before" Style="{StaticResource CaptionText}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-   <ComboBox Width="340" ItemsSource="{Binding Session.History}" DisplayMemberPath="Label" SelectedItem="{Binding CompareBefore}" AutomationProperties.Name="Snapshot to compare against"/>
-   <TextBlock Style="{StaticResource Icon}" Text="&#xE72A;" Margin="12,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
-   <TextBlock Text="After" Style="{StaticResource CaptionText}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-   <ComboBox Width="340" ItemsSource="{Binding Session.History}" DisplayMemberPath="Label" SelectedItem="{Binding Session.SelectedSnapshot}" AutomationProperties.Name="Current snapshot"/>
-   <Button Style="{StaticResource AccentButtonStyle}" Content="Compare" Command="{Binding CompareCommand}" Margin="12,0,0,0" MinWidth="100"/>
-  </StackPanel>
-  <Border Grid.Row="2" Style="{StaticResource Card}" Padding="0">
+  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition/></Grid.RowDefinitions>
+
+  <DockPanel Margin="0,0,0,14">
+   <Button DockPanel.Dock="Right" Style="{StaticResource AccentButtonStyle}" Content="Compare" Command="{Binding CompareCommand}" MinWidth="110" VerticalAlignment="Center"/>
+   <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+    <TextBlock Text="Compare" Style="{StaticResource TitleText}" Margin="0,0,20,0"/>
+    <TextBlock Text="Before" Style="{StaticResource CaptionText}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+    <ComboBox Width="300" ItemsSource="{Binding Session.History}" DisplayMemberPath="Label" SelectedItem="{Binding CompareBefore}" IsEnabled="{Binding Session.CanInteract}" AutomationProperties.Name="Before snapshot" VerticalAlignment="Center"/>
+    <TextBlock Style="{StaticResource Icon}" Text="&#xE72A;" Margin="10,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}"/>
+    <TextBlock Text="After" Style="{StaticResource CaptionText}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+    <ComboBox Width="300" ItemsSource="{Binding Session.History}" DisplayMemberPath="Label" SelectedItem="{Binding Session.SelectedSnapshot}" IsEnabled="{Binding Session.CanInteract}" AutomationProperties.Name="After snapshot" VerticalAlignment="Center"/>
+    <Button Style="{StaticResource IconButton}" Content="&#xE8AB;" Command="{Binding SwapCommand}" AutomationProperties.Name="Swap snapshots" ToolTip="Swap" Margin="6,0,0,0"/>
+   </StackPanel>
+  </DockPanel>
+
+  <Border Grid.Row="1" Style="{StaticResource CautionCallout}" Margin="0,0,0,12" Visibility="{Binding HasWarning, Converter={StaticResource Visible}}">
    <DockPanel>
-    <Border DockPanel.Dock="Top" Style="{StaticResource CardHeader}">
-     <TextBlock Text="First 250 added, removed, or grown files, largest first. Partial snapshots can show false additions or removals." Style="{StaticResource CaptionText}" TextWrapping="Wrap"/>
-    </Border>
-    <DataGrid Style="{StaticResource ListGrid}" ItemsSource="{Binding Differences}" AutomationProperties.Name="Changed files">
-     <DataGrid.Columns>
-      <DataGridTextColumn Header="Change" Binding="{Binding Change}" Width="100"/>
-      <DataGridTextColumn Header="Before bytes" Binding="{Binding Before, StringFormat=N0}" Width="130"/>
-      <DataGridTextColumn Header="After bytes" Binding="{Binding After, StringFormat=N0}" Width="130"/>
-      <DataGridTextColumn Header="Change bytes" Binding="{Binding Delta, StringFormat=N0}" Width="130"/>
-      <DataGridTextColumn Header="Path" Binding="{Binding Path}" Width="*"/>
-     </DataGrid.Columns>
-    </DataGrid>
+    <TextBlock Style="{StaticResource Icon}" Text="&#xE7BA;" Margin="0,0,10,0" Foreground="{DynamicResource SystemFillColorCautionBrush}"/>
+    <Button DockPanel.Dock="Right" Style="{StaticResource SubtleButton}" Content="View diagnostics" Command="{Binding DataContext.GoCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="5"/>
+    <TextBlock Text="{Binding WarningText}" Style="{StaticResource BodyText}" VerticalAlignment="Center"/>
    </DockPanel>
   </Border>
+
+  <UniformGrid Grid.Row="2" Columns="4" Margin="0,0,0,12" Visibility="{Binding HasResults, Converter={StaticResource Visible}}">
+   <Border Style="{StaticResource Card}" Margin="0,0,6,0" Padding="18,12"><StackPanel><TextBlock Text="Net change" Style="{StaticResource CaptionText}"/><TextBlock Text="{Binding NetText}" Style="{StaticResource Total}"/><TextBlock Text="logical size" Style="{StaticResource CaptionText}"/></StackPanel></Border>
+   <Border Style="{StaticResource Card}" Margin="6,0" Padding="18,12"><StackPanel><TextBlock Text="Added" Style="{StaticResource CaptionText}"/><TextBlock Text="{Binding AddedText}" Style="{StaticResource Total}"/><TextBlock Text="{Binding AddedFiles}" Style="{StaticResource CaptionText}"/></StackPanel></Border>
+   <Border Style="{StaticResource Card}" Margin="6,0" Padding="18,12"><StackPanel><TextBlock Text="Removed" Style="{StaticResource CaptionText}"/><TextBlock Text="{Binding RemovedText}" Style="{StaticResource Total}"/><TextBlock Text="{Binding RemovedFiles}" Style="{StaticResource CaptionText}"/></StackPanel></Border>
+   <Border Style="{StaticResource Card}" Margin="6,0,0,0" Padding="18,12"><StackPanel><TextBlock Text="Changed size" Style="{StaticResource CaptionText}"/><TextBlock Text="{Binding GrownText}" Style="{StaticResource Total}"/><TextBlock Text="{Binding GrownFiles}" Style="{StaticResource CaptionText}"/></StackPanel></Border>
+  </UniformGrid>
+
+  <Border Grid.Row="3" Style="{StaticResource Card}" Visibility="{Binding NoResults, Converter={StaticResource Visible}}">
+   <TextBlock Text="Choose two snapshots of the same roots, then Compare. FileViz totals every change and shows where it happened by folder." Style="{StaticResource CaptionText}" TextWrapping="Wrap"/>
+  </Border>
+
+  <Grid Grid.Row="3" Visibility="{Binding HasResults, Converter={StaticResource Visible}}">
+   <Grid.ColumnDefinitions><ColumnDefinition Width="500"/><ColumnDefinition Width="16"/><ColumnDefinition/></Grid.ColumnDefinitions>
+   <Border Style="{StaticResource Card}" Padding="0">
+    <DockPanel>
+     <Border DockPanel.Dock="Top" Style="{StaticResource CardHeader}">
+      <DockPanel>
+       <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+        <Rectangle Width="10" Height="10" RadiusX="3" RadiusY="3" Fill="{DynamicResource AccentFillColorDefaultBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/><TextBlock Text="Shrank" Style="{StaticResource CaptionText}" Margin="0,0,12,0"/>
+        <Rectangle Width="10" Height="10" RadiusX="3" RadiusY="3" Fill="{StaticResource CategoryArchiveBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/><TextBlock Text="Grew" Style="{StaticResource CaptionText}"/>
+       </StackPanel>
+       <TextBlock Text="Where it changed" Style="{StaticResource BodyStrongText}"/>
+      </DockPanel>
+     </Border>
+     <TextBlock DockPanel.Dock="Bottom" Text="Folder totals include everything below them." Style="{StaticResource CaptionText}" Margin="16,8"/>
+     <TextBlock DockPanel.Dock="Top" Text="No folder changed size between these snapshots." Style="{StaticResource CaptionText}" Margin="16,12" Visibility="{Binding Unchanged, Converter={StaticResource Visible}}"/>
+     <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
+      <ItemsControl ItemsSource="{Binding Folders}" Focusable="False" AutomationProperties.Name="Change by folder">
+       <ItemsControl.ItemTemplate>
+        <DataTemplate>
+         <Grid Margin="16,0" Height="40" ToolTip="{Binding Path}">
+          <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="112"/><ColumnDefinition Width="112"/><ColumnDefinition Width="84"/></Grid.ColumnDefinitions>
+          <TextBlock Text="{Binding Name}" Style="{StaticResource MonoText}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,12,0"/>
+          <Border Grid.Column="1" BorderBrush="{DynamicResource ControlStrongStrokeColorDefaultBrush}" BorderThickness="0,0,1,0" Height="20"><Border Width="{Binding ShrinkWidth}" Height="12" CornerRadius="3,0,0,3" Background="{DynamicResource AccentFillColorDefaultBrush}" HorizontalAlignment="Right"/></Border>
+          <Border Grid.Column="2" Width="{Binding GrowWidth}" Height="12" CornerRadius="0,3,3,0" Background="{StaticResource CategoryArchiveBrush}" HorizontalAlignment="Left"/>
+          <TextBlock Grid.Column="3" Text="{Binding Delta}" Style="{StaticResource BodyStrongText}" FontSize="13" TextAlignment="Right" VerticalAlignment="Center" Typography.NumeralAlignment="Tabular"/>
+         </Grid>
+        </DataTemplate>
+       </ItemsControl.ItemTemplate>
+      </ItemsControl>
+     </ScrollViewer>
+    </DockPanel>
+   </Border>
+   <Border Grid.Column="2" Style="{StaticResource Card}" Padding="0">
+    <DockPanel>
+     <Border DockPanel.Dock="Top" Style="{StaticResource CardHeader}" Padding="12,8">
+      <DockPanel>
+       <TextBlock DockPanel.Dock="Right" Text="First 250 changes · by size change" Style="{StaticResource CaptionText}" VerticalAlignment="Center"/>
+       <Border Style="{StaticResource SegmentTrack}">
+        <StackPanel Orientation="Horizontal">
+         <RadioButton Style="{StaticResource Segment}" GroupName="Change" Content="All" IsChecked="{Binding ShowAll}"/>
+         <RadioButton Style="{StaticResource Segment}" GroupName="Change" Content="Added" IsChecked="{Binding ShowAdded}"/>
+         <RadioButton Style="{StaticResource Segment}" GroupName="Change" Content="Removed" IsChecked="{Binding ShowRemoved}"/>
+         <RadioButton Style="{StaticResource Segment}" GroupName="Change" Content="Grown" IsChecked="{Binding ShowGrown}"/>
+        </StackPanel>
+       </Border>
+      </DockPanel>
+     </Border>
+     <TextBlock DockPanel.Dock="Top" Text="No files were added, removed, or changed size." Style="{StaticResource CaptionText}" Margin="16,12" Visibility="{Binding Unchanged, Converter={StaticResource Visible}}"/>
+     <DataGrid Style="{StaticResource ListGrid}" ItemsSource="{Binding Differences}" AutomationProperties.Name="Changed files">
+      <DataGrid.Columns>
+       <DataGridTemplateColumn Header="Change" Width="96">
+        <DataGridTemplateColumn.CellTemplate><DataTemplate>
+         <Border x:Name="Pill" Style="{StaticResource Badge}" BorderThickness="0"><TextBlock x:Name="Label" Text="{Binding Change}" Style="{StaticResource BadgeText}"/></Border>
+         <DataTemplate.Triggers>
+          <DataTrigger Binding="{Binding Change}" Value="Added"><Setter TargetName="Pill" Property="Background" Value="{DynamicResource SystemFillColorCautionBackgroundBrush}"/><Setter TargetName="Label" Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}"/></DataTrigger>
+          <DataTrigger Binding="{Binding Change}" Value="Removed"><Setter TargetName="Pill" Property="Background" Value="{DynamicResource SystemFillColorAttentionBackgroundBrush}"/><Setter TargetName="Label" Property="Foreground" Value="{DynamicResource AccentTextFillColorPrimaryBrush}"/></DataTrigger>
+         </DataTemplate.Triggers>
+        </DataTemplate></DataGridTemplateColumn.CellTemplate>
+       </DataGridTemplateColumn>
+       <DataGridTextColumn Header="Path" Binding="{Binding Path}" Width="*">
+        <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="FontFamily" Value="{StaticResource MonoFont}"/><Setter Property="FontSize" Value="12"/><Setter Property="TextTrimming" Value="CharacterEllipsis"/></Style></DataGridTextColumn.ElementStyle>
+       </DataGridTextColumn>
+       <DataGridTextColumn Header="Before" Binding="{Binding Before, Converter={StaticResource Bytes}}" Width="84"/>
+       <DataGridTextColumn Header="After" Binding="{Binding After, Converter={StaticResource Bytes}}" Width="84"/>
+       <DataGridTextColumn Header="Change" Binding="{Binding Delta, Converter={StaticResource SignedBytes}}" Width="90"/>
+      </DataGrid.Columns>
+     </DataGrid>
+    </DockPanel>
+   </Border>
+  </Grid>
  </Grid>
 </UserControl>

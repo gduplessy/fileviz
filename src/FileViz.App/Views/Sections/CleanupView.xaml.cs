@@ -1,7 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
 using FileViz.App.ViewModels;
-using FileViz.Core;
 namespace FileViz.App.Views.Sections;
 
 public partial class CleanupView : UserControl
@@ -10,12 +9,17 @@ public partial class CleanupView : UserControl
     private CleanupViewModel Model => (CleanupViewModel)DataContext;
     private void Restore_Click(object sender, RoutedEventArgs e)
     {
-        if (CleanupGrid.SelectedItem is CleanupRecord record)
+        if (Model.Selected is { } record)
             Model.Restore(record);
+    }
+    private void Show_Click(object sender, RoutedEventArgs e)
+    {
+        if (Model.Selected is { } record)
+            Shell.ShowInExplorer(record.State == "Quarantined" ? record.Destination : record.Original);
     }
     private void Recycle_Click(object sender, RoutedEventArgs e)
     {
-        if (CleanupGrid.SelectedItem is CleanupRecord record && MessageBox.Show(Window.GetWindow(this), "Ask Windows to send this quarantined file to its Recycle Bin? Windows will display any additional confirmation or unavailable-recycle warning.", "Review Recycle Bin request", MessageBoxButton.OKCancel, MessageBoxImage.Question) == MessageBoxResult.OK)
+        if (Model.Selected is { } record && MessageBox.Show(Window.GetWindow(this), "Ask Windows to send this quarantined file to its Recycle Bin? Windows will display any additional confirmation or unavailable-recycle warning.", "Send to Recycle Bin", MessageBoxButton.OKCancel, MessageBoxImage.Question) == MessageBoxResult.OK)
             Model.Recycle(record);
     }
 }

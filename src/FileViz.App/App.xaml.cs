@@ -111,6 +111,15 @@ public partial class App : Application
                     await Capture(ThemeMode.Dark, "dialog-review-dark.png", review);
                     review.Close();
                     window.Model.Duplicates.ClearCommand.Execute(null);
+                    // A second snapshot of the unchanged fixture exercises the Compare layout.
+                    await window.Model.Home.ScanAsync([Path.GetFullPath(e.Args[1])]);
+                    window.Model.Compare.CompareBefore = window.Model.Session.History[1];
+                    window.Model.SelectedNav = window.Model.NavItems[3];
+                    window.Model.Compare.CompareCommand.Execute(null);
+                    await Task.Delay(1500);
+                    await Capture(ThemeMode.Light, "section-compare-result.png");
+                    await Capture(ThemeMode.Dark, "section-compare-result-dark.png");
+                    await window.Model.Duplicates.FindDuplicatesAsync();
                 }
                 File.WriteAllText(Path.Combine(Path.GetFullPath(e.Args[2]), "smoke.json"), System.Text.Json.JsonSerializer.Serialize(new
                 {

@@ -51,3 +51,17 @@ public sealed class BytesConverter : IValueConverter
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) => value is long bytes ? FileViz.Core.Format.Bytes(bytes) : "";
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => DependencyProperty.UnsetValue;
 }
+
+/// <summary>Formats a signed byte change as "+1.2 MiB" or "−300 KiB".</summary>
+public sealed class SignedBytesConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) => value is long bytes ? (bytes >= 0 ? "+" : "−") + FileViz.Core.Format.Bytes(Math.Abs(bytes)) : "";
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => DependencyProperty.UnsetValue;
+}
+
+/// <summary>Visible when a number is greater than zero.</summary>
+public sealed class PositiveVisibilityConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) => value is int and > 0 or long and > 0 ? Visibility.Visible : Visibility.Collapsed;
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => DependencyProperty.UnsetValue;
+}
