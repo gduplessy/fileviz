@@ -160,6 +160,8 @@ public sealed class HomeViewModel : Bindable, ISnapshotSection
             var info = new ProcessStartInfo(Environment.ProcessPath!) { UseShellExecute = true, Verb = "runas" };
             info.ArgumentList.Add("--roots");
             info.ArgumentList.Add(JsonSerializer.Serialize(Roots()));
+            info.ArgumentList.Add("--database");
+            info.ArgumentList.Add(session.DatabasePath);
             info.ArgumentList.Add("--wait-parent");
             info.ArgumentList.Add(Environment.ProcessId.ToString());
             Process.Start(info);
