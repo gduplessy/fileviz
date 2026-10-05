@@ -195,4 +195,27 @@ public class IndexTests
         Assert.Throws<OperationCanceledException>(() => store.RefreshAliases(id, [a with { Length = 7 }], cancellation.Token));
         Assert.All(store.Query(id, new()), entry => Assert.Equal(3, entry.Length));
     }
+
+    [Fact]
+    public void FinalizationReportsIndexesAndAggregatesBeforeCompletingTheSnapshot()
+    {
+        using var fixture = new Fixture();
+        using var store = new IndexStore(Path.Combine(fixture.Root, "stages.db"));
+        var id = store.CreateSnapshot([fixture.Root]);
+        var entry = new FileEntry(Path.Combine(fixture.Root, "a"), fixture.Root, "a", "id", false, 3, 8, 100, 100, 32);
+        store.AddBatch(id, new(fixture.Root, "Fixture", [entry], []));
+        var stages = new List<string>();
+        store.Finish(id, "Complete", stage =>
+        {
+            Assert.Equal("Scanning", Assert.Single(store.Snapshots()).State);
+            stages.Add(stage);
+        });
+        Assert.Equal(7, stages.Count(x => x.StartsWith("Preparing file views", StringComparison.Ordinal)));
+        Assert.Contains("Calculating folder sizes", stages);
+        Assert.Contains("Calculating file types and ages", stages);
+        Assert.Contains("Summarizing drive usage", stages);
+        Assert.Equal("Saving snapshot", stages[^1]);
+        Assert.Equal("Complete", Assert.Single(store.Snapshots()).State);
+        Assert.Equal(3, store.GetSummary(id).Logical);
+    }
 }

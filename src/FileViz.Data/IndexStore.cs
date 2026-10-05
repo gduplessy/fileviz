@@ -71,13 +71,17 @@ public sealed partial class IndexStore : IDisposable
             Execute("INSERT INTO errors(snapshot,path,message,kind) VALUES($s,$p,$m,$k);", ("$s", snapshot), ("$p", error.Path), ("$m", error.Message), ("$k", error.Kind));
         transaction.Commit();
     }
-    public void Finish(long snapshot, string state)
+    public void Finish(long snapshot, string state, Action<string>? progress = null)
     {
-        CreateQueryIndexes(snapshot);
+        CreateQueryIndexes(snapshot, progress);
+        progress?.Invoke("Calculating folder sizes");
         RebuildFolders(snapshot);
+        progress?.Invoke("Calculating file types and ages");
         BuildComposition(snapshot);
+        progress?.Invoke("Summarizing drive usage");
         var summary = GetSummaryRaw(snapshot);
         CacheSummaries(snapshot, summary);
+        progress?.Invoke("Saving snapshot");
         Execute("UPDATE snapshots SET state=$state,files=$files,logical=$logical,allocated=$allocated,errors=$errors WHERE id=$s;",
             ("$state", summary.Errors > 0 && state == "Complete" ? "Partial" : state), ("$files", summary.Files), ("$logical", summary.Logical), ("$allocated", summary.Allocated), ("$errors", summary.Errors), ("$s", snapshot));
         Execute("PRAGMA wal_checkpoint(TRUNCATE);");
@@ -121,7 +125,7 @@ public sealed partial class IndexStore : IDisposable
         long Value(int index) => reader.IsDBNull(index) ? 0 : reader.GetInt64(index);
         return new(Value(0), Value(1), Value(2), Value(3), Value(4), Value(5));
     }
-    private void CreateQueryIndexes(long snapshot)
+    private void CreateQueryIndexes(long snapshot, Action<string>? progress)
     {
         // Existing snapshots keep their indexes. New rows do not satisfy old index predicates,
         // so scanning does not update six large B-trees for every incoming file.
@@ -135,8 +139,13 @@ public sealed partial class IndexStore : IDisposable
             ["name"] = "name_key,path",
             ["extension"] = "root,extension,length DESC"
         };
+        var index = 0;
         foreach (var item in definitions)
+        {
+            progress?.Invoke($"Preparing file views ({++index}/{definitions.Count}): {item.Key.Replace('_', ' ')}");
             Execute($"CREATE INDEX IF NOT EXISTS entry_{snapshot}_{item.Key} ON entries({item.Value}) WHERE snapshot={snapshot};");
+        }
+        progress?.Invoke("Optimizing file queries");
         Execute("PRAGMA analysis_limit=1000; ANALYZE entries;");
     }
     public List<string> PrimaryQueryPlan(long snapshot, string root)

@@ -77,7 +77,17 @@ public partial class App : Application
                     await Capture(ThemeMode.Light, "section-firstrun.png");
                     await Capture(ThemeMode.Dark, "section-firstrun-dark.png");
                 }
+                var scanStages = new HashSet<string>(StringComparer.Ordinal);
+                window.Model.Home.PropertyChanged += (_, args) =>
+                {
+                    if (args.PropertyName == nameof(FileViz.App.ViewModels.HomeViewModel.ProgressText))
+                        scanStages.Add(window.Model.Home.ProgressText);
+                };
                 await window.Model.Home.ScanAsync([Path.GetFullPath(e.Args[1])]);
+                if (!scanStages.Contains("Identifying hard links; preparing identity index")
+                    || !scanStages.Any(x => x.StartsWith("Preparing file views", StringComparison.Ordinal))
+                    || !scanStages.Contains("Saving snapshot") || window.Model.Home.ScanEngine != "Finalizing")
+                    throw new InvalidOperationException("Scan progress must expose hard-link refresh and snapshot finalization.");
                 await window.Model.Duplicates.FindDuplicatesAsync();
                 if (!string.Equals(window.Model.Session.CurrentRoot, Path.GetFullPath(e.Args[1]), StringComparison.OrdinalIgnoreCase) || window.Model.Explorer.MapItems.Count == 0)
                     throw new InvalidOperationException("Snapshot root and populated treemap must remain selected after a scan.");

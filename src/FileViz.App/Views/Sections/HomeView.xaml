@@ -89,7 +89,7 @@
       <TextBlock Margin="0,0,28,0" Typography.NumeralAlignment="Tabular"><Run Text="Logical " Foreground="{DynamicResource TextFillColorSecondaryBrush}"/><Run Text="{Binding ScanBytes, Mode=OneWay}" FontWeight="SemiBold"/></TextBlock>
       <TextBlock Margin="0,0,28,0" Typography.NumeralAlignment="Tabular"><Run Text="Elapsed " Foreground="{DynamicResource TextFillColorSecondaryBrush}"/><Run Text="{Binding ScanElapsed, Mode=OneWay}" FontWeight="SemiBold"/></TextBlock>
      </WrapPanel>
-     <TextBlock Text="Labelled Partial until the scan completes. Pause waits for the current batch." Style="{StaticResource CaptionText}" Margin="0,8,0,0"/>
+     <TextBlock Text="Partial until completion. Pause waits for the current batch or finalization step. Saving partial results can continue after cancellation." Style="{StaticResource CaptionText}" Margin="0,8,0,0" TextWrapping="Wrap"/>
     </StackPanel>
    </Border>
 

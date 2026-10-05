@@ -218,7 +218,7 @@ public sealed class HomeViewModel : Bindable, ISnapshotSection
     private string[] Roots() => Paths.DistinctRoots(Drives.Where(x => x.Selected).Select(x => Native.ResolveNetwork(x.Path)).Concat(Lines(ExtraRoots).Select(Native.ResolveNetwork)));
     private string[] Excluded() => Lines(Exclusions).Append(Path.GetDirectoryName(session.DatabasePath)!).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
     private static string[] Lines(string text) => text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-    private readonly record struct ScanUpdate(string Text, string Engine, long Files, long Bytes, ScanProgress? Work);
+    private readonly record struct ScanUpdate(string Text, string Engine, long Files, long Bytes, ScanProgress? Work = null, string Detail = "");
     public async Task ScanAsync(string[]? rootsOverride = null)
     {
         if (session.Busy)
@@ -251,7 +251,8 @@ public sealed class HomeViewModel : Bindable, ISnapshotSection
         var progress = new Progress<ScanUpdate>(update =>
         {
             session.Status = update.Text;
-            ScanEngine = update.Engine.StartsWith("MFT", StringComparison.Ordinal) || update.Engine == "Raw MFT" ? "Raw MFT" : "Directory";
+            ScanEngine = update.Engine.StartsWith("MFT", StringComparison.Ordinal) || update.Engine == "Raw MFT" ? "Raw MFT"
+                : update.Engine.StartsWith("Directory", StringComparison.Ordinal) ? "Directory" : update.Engine;
             ScanFiles = update.Files;
             ScanBytes = Format.Bytes(update.Bytes);
             ProgressKnown = update.Work is { Total: > 0 };
@@ -260,7 +261,14 @@ public sealed class HomeViewModel : Bindable, ISnapshotSection
                 ProgressValue = 100d * work.Done / work.Total;
                 ProgressText = $"MFT records {work.Done / 2:N0} of {work.Total / 2:N0} · pass {(work.Done * 2 <= work.Total ? 1 : 2)} of 2";
             }
+            else
+            {
+                ProgressValue = 0;
+                ProgressText = update.Detail;
+            }
         });
+        void ReportPhase(string engine, string detail) => ((IProgress<ScanUpdate>)progress).Report(
+            new(detail, engine, tally.Files, tally.Bytes, Detail: detail));
         session.Status = "Starting scan…";
         try
         {
@@ -275,10 +283,13 @@ public sealed class HomeViewModel : Bindable, ISnapshotSection
                     await session.WaitIfPausedAsync(token);
                     writer.AddBatch(snapshot, batch);
                     tally.Add(batch);
-                    ((IProgress<ScanUpdate>)progress).Report(new($"{batch.Engine} · {tally.Entries:N0} entries · {batch.Root}", batch.Engine, tally.Files, tally.Bytes, batch.Progress));
+                    ((IProgress<ScanUpdate>)progress).Report(new($"{batch.Engine} · {tally.Entries:N0} entries · {batch.Root}", batch.Engine, tally.Files, tally.Bytes, batch.Progress,
+                        batch.Restart ? "Raw MFT unavailable; restarting directory enumeration." : "Enumerating metadata; total not known."));
                 }, token);
+                ReportPhase("Hard links", "Identifying hard links; preparing identity index");
                 var aliases = new List<string>(64);
                 var aliasBytes = 0;
+                long refreshedAliases = 0;
                 async Task RefreshAliases()
                 {
                     if (aliases.Count == 0)
@@ -298,6 +309,8 @@ public sealed class HomeViewModel : Bindable, ISnapshotSection
                         errors.Add(new(entry.Path, "Hard-link identity changed during metadata refresh."));
                     if (errors.Count > 0)
                         writer.AddBatch(snapshot, new("", "Hard-link metadata", [], errors.ToArray()));
+                    refreshedAliases += aliases.Count;
+                    ReportPhase("Hard links", $"Refreshed {refreshedAliases:N0} hard-link identities; total not known");
                     aliases.Clear();
                     aliasBytes = 0;
                 }
@@ -321,13 +334,31 @@ public sealed class HomeViewModel : Bindable, ISnapshotSection
         {
             try
             {
-                await Task.Run(() => { using var writer = new IndexStore(database); writer.Finish(snapshot, state); });
+                await Task.Run(() =>
+                {
+                    using var writer = new IndexStore(database);
+                    writer.Finish(snapshot, state, detail =>
+                    {
+                        ReportPhase("Finalizing", detail);
+                        // Long SQLite statements finish before pause can take effect.
+                        session.WaitIfPausedAsync(CancellationToken.None).GetAwaiter().GetResult();
+                    });
+                    if (state == "Complete" && token.IsCancellationRequested)
+                    {
+                        state = "Cancelled";
+                        writer.SetState(snapshot, state);
+                    }
+                });
             }
             finally { scanTimer.Stop(); ScanElapsed = Format.Elapsed(scanTimer.Elapsed); clock.Stop(); session.EndWork(); }
             session.OpenSnapshot(snapshot);
             await session.RefreshAsync();
             if (state == "Complete")
                 session.Status = "Scan complete. Review diagnostics for any coverage gaps.";
+            else if (state == "Cancelled")
+                session.Status = "Scan cancelled. Partial snapshot saved.";
+            else
+                session.Status = "Scan failed. Partial snapshot saved; review diagnostics.";
         }
     }
 }
