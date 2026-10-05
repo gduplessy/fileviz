@@ -56,10 +56,6 @@ public partial class App : Application
                 window.Model.Home.PreferMft = false;
                 window.Model.Home.Drives.Clear();
                 window.Model.Home.Drives.Add(new FileViz.App.ViewModels.DriveRow(Path.GetFullPath(e.Args[1]), "Fixture · local sample data", "Disposable 40 MiB validation fixture", true));
-                await window.Model.Home.ScanAsync([Path.GetFullPath(e.Args[1])]);
-                await window.Model.Duplicates.FindDuplicatesAsync();
-                if (!string.Equals(window.Model.Session.CurrentRoot, Path.GetFullPath(e.Args[1]), StringComparison.OrdinalIgnoreCase) || window.Model.Explorer.MapItems.Count == 0)
-                    throw new InvalidOperationException("Snapshot root and populated treemap must remain selected after a scan.");
                 // Mica is a DWM backdrop and does not appear in RenderTargetBitmap, so captures use the solid base color.
                 window.SetResourceReference(Control.BackgroundProperty, "SolidBackgroundFillColorBaseBrush");
                 async Task Capture(ThemeMode theme, string file)
@@ -74,9 +70,19 @@ public partial class App : Application
                     using var output = File.Create(Path.Combine(Path.GetFullPath(e.Args[2]), file));
                     encoder.Save(output);
                 }
+                var sections = Environment.GetEnvironmentVariable("FILEVIZ_SMOKE_SECTIONS") == "1";
+                if (sections)
+                {
+                    await Capture(ThemeMode.Light, "section-firstrun.png");
+                    await Capture(ThemeMode.Dark, "section-firstrun-dark.png");
+                }
+                await window.Model.Home.ScanAsync([Path.GetFullPath(e.Args[1])]);
+                await window.Model.Duplicates.FindDuplicatesAsync();
+                if (!string.Equals(window.Model.Session.CurrentRoot, Path.GetFullPath(e.Args[1]), StringComparison.OrdinalIgnoreCase) || window.Model.Explorer.MapItems.Count == 0)
+                    throw new InvalidOperationException("Snapshot root and populated treemap must remain selected after a scan.");
                 await Capture(ThemeMode.Light, "desktop.png");
                 await Capture(ThemeMode.Dark, "desktop-dark.png");
-                if (Environment.GetEnvironmentVariable("FILEVIZ_SMOKE_SECTIONS") == "1")
+                if (sections)
                     foreach (var item in window.Model.NavItems.Append(window.Model.SettingsNav))
                     {
                         window.Model.SelectedNav = item;

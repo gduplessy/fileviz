@@ -18,6 +18,7 @@ public sealed class MftScanEngine : IScanEngine
         // Only directory ancestry stays in memory. A cap forces streaming directory enumeration for unusually directory-heavy volumes.
         var directories = new Dictionary<ulong, NtfsName>();
         var counter = 0L;
+        var total = 2 * reader.RecordCount;
         long ancestryBytes = 0;
         ulong rootReference = 0;
         foreach (var record in reader.Records(cancellationToken, true))
@@ -37,7 +38,7 @@ public sealed class MftScanEngine : IScanEngine
                     throw new NotSupportedException("Directory ancestry exceeds the raw scanner memory budget; using directory enumeration.");
             }
             if (++counter % 16384 == 0)
-                yield return new(scope.Root, $"MFT: indexing ancestry ({counter:N0} records)", [], []);
+                yield return new(scope.Root, $"MFT: indexing ancestry ({counter:N0} records)", [], [], Progress: new(counter, total));
         }
         if (rootReference == 0)
             throw new InvalidDataException("Missing NTFS root record.");
@@ -48,8 +49,11 @@ public sealed class MftScanEngine : IScanEngine
         var pathCache = new Dictionary<ulong, string>();
         var entries = new List<FileEntry>(256);
         var errors = new List<ScanError>();
+        // Two passes over the MFT: ancestry, then entries. Progress counts both.
+        var processed = counter;
         foreach (var record in reader.Records(cancellationToken))
         {
+            processed++;
             if (!record.InUse || record.BaseReference != 0 || (record.Reference & NtfsParser.ReferenceMask) == 5)
                 continue;
             var full = reader.Complete(record);
@@ -90,7 +94,7 @@ public sealed class MftScanEngine : IScanEngine
                 budget += 6 * (path.Length + parent.Length + name.Name.Length) + 1024;
                 if (entries.Count == 256 || budget >= 1024 * 1024)
                 {
-                    yield return new(scope.Root, "Raw MFT", entries.ToArray(), errors.ToArray());
+                    yield return new(scope.Root, "Raw MFT", entries.ToArray(), errors.ToArray(), Progress: new(Math.Min(processed, total), total));
                     entries.Clear();
                     budget = 0;
                     errors.Clear();
@@ -99,7 +103,7 @@ public sealed class MftScanEngine : IScanEngine
         }
         reader.ValidateStableMft();
         if (entries.Count > 0 || errors.Count > 0)
-            yield return new(scope.Root, "Raw MFT", entries.ToArray(), errors.ToArray());
+            yield return new(scope.Root, "Raw MFT", entries.ToArray(), errors.ToArray(), Progress: new(total, total));
     }
     private static string Resolve(ulong reference, string root, Dictionary<ulong, NtfsName> directories, Dictionary<ulong, string> cache, ulong rootReference, ref long cacheBytes)
     {
@@ -148,6 +152,8 @@ internal sealed class MftReader : IDisposable
     private readonly SafeFileHandle handle; private readonly FileStream stream;
     private readonly int sectorSize, clusterSize, recordSize; private readonly long volumeBytes;
     private readonly DataRun[] runs; private readonly long length; private readonly ulong mftReference;
+    /// <summary>Number of file records in the MFT, used as the scan progress denominator.</summary>
+    public long RecordCount => length / recordSize;
     public MftReader(string root)
     {
         var volume = Native.VolumeName(root).TrimEnd('\\');

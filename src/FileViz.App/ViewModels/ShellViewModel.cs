@@ -99,6 +99,7 @@ public sealed class ShellViewModel : Bindable, IDisposable
         Compare = new(Session);
         Diagnostics = new(Session);
         Settings = new(Session);
+        Session.Register(Home);
         Session.Register(Explorer);
         Session.Register(Duplicates);
         Session.Register(Compare);

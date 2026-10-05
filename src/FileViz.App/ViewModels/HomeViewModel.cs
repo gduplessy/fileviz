@@ -11,9 +11,11 @@ using Microsoft.Win32;
 namespace FileViz.App.ViewModels;
 
 /// <summary>Scan scope, options, profiles, and the scan itself.</summary>
-public sealed class HomeViewModel : Bindable
+public sealed class HomeViewModel : Bindable, ISnapshotSection
 {
     private readonly SessionViewModel session;
+    private readonly System.Windows.Threading.DispatcherTimer clock = new() { Interval = TimeSpan.FromSeconds(1) };
+    private DateTime scanStarted;
     public SessionViewModel Session => session;
     public ObservableCollection<DriveRow> Drives { get; } = [];
     public ObservableCollection<ScanProfile> Profiles { get; } = [];
@@ -36,6 +38,50 @@ public sealed class HomeViewModel : Bindable
                 Changed(nameof(PreferMft));
                 Changed(nameof(ProfileName));
             }
+        }
+    }
+    /// <summary>No snapshot exists yet: Home shows the first-run layout.</summary>
+    public bool IsFirstRun => session.History.Count == 0 && !session.Scanning;
+    public bool HasHistory => !IsFirstRun;
+    private string scanTarget = ""; public string ScanTarget
+    {
+        get => scanTarget; private set => Set(ref scanTarget, value);
+    }
+    private string scanEngine = ""; public string ScanEngine
+    {
+        get => scanEngine; private set => Set(ref scanEngine, value);
+    }
+    public string ScanWorker => session.Administrator ? "Read-only elevated worker" : "Read-only worker";
+    private long scanFiles; public long ScanFiles
+    {
+        get => scanFiles; private set => Set(ref scanFiles, value);
+    }
+    private string scanBytes = "0 B"; public string ScanBytes
+    {
+        get => scanBytes; private set => Set(ref scanBytes, value);
+    }
+    private string scanElapsed = "0:00"; public string ScanElapsed
+    {
+        get => scanElapsed; private set => Set(ref scanElapsed, value);
+    }
+    private bool progressKnown; public bool ProgressKnown
+    {
+        get => progressKnown; private set => Set(ref progressKnown, value);
+    }
+    private double progressValue; public double ProgressValue
+    {
+        get => progressValue; private set => Set(ref progressValue, value);
+    }
+    private string progressText = ""; public string ProgressText
+    {
+        get => progressText; private set => Set(ref progressText, value);
+    }
+    public string ScanButtonText
+    {
+        get
+        {
+            var count = Drives.Count(x => x.Selected) + Lines(ExtraRoots).Length;
+            return count switch { 0 => "Scan", 1 => "Scan 1 selected root", _ => $"Scan {count} selected roots" };
         }
     }
     public ICommand ScanCommand
@@ -61,6 +107,23 @@ public sealed class HomeViewModel : Bindable
     public HomeViewModel(SessionViewModel session)
     {
         this.session = session;
+        clock.Tick += (_, _) => ScanElapsed = (DateTime.UtcNow - scanStarted).ToString(@"m\:ss");
+        session.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(SessionViewModel.Scanning))
+            {
+                Changed(nameof(IsFirstRun));
+                Changed(nameof(HasHistory));
+            }
+            if (e.PropertyName == nameof(SessionViewModel.Administrator))
+                Changed(nameof(ScanWorker));
+        };
+        Drives.CollectionChanged += (_, e) =>
+        {
+            foreach (var row in e.NewItems?.OfType<DriveRow>() ?? [])
+                row.PropertyChanged += (_, args) => { if (args.PropertyName == nameof(DriveRow.Selected)) Changed(nameof(ScanButtonText)); };
+            Changed(nameof(ScanButtonText));
+        };
         ScanCommand = new ActionCommand(() => session.Run(() => ScanAsync()), () => !session.Busy);
         RescanCommand = new ActionCommand(() => session.Run(() => ScanAsync(session.SnapshotRoots.ToArray())), () => !session.Busy && session.SnapshotRoots.Count > 0);
         AddRootCommand = new ActionCommand(AddRoot, () => !session.Busy);
@@ -97,14 +160,18 @@ public sealed class HomeViewModel : Bindable
             {
                 try
                 {
+                    var letter = drive.Name.TrimEnd('\\');
                     if (drive.DriveType == DriveType.Network)
                     {
-                        result.Add(new(drive.Name, drive.Name + " · Network", "Uses your Windows share credentials"));
+                        result.Add(new(drive.Name, $"Network ({letter})", "Network share", engine: "Directory scan · Windows credentials"));
                         continue;
                     }
                     if (!drive.IsReady)
                         continue;
-                    result.Add(new(drive.Name, drive.Name + " · " + drive.VolumeLabel, $"{drive.DriveFormat} · {Format.Bytes(drive.TotalSize - drive.AvailableFreeSpace)} used · {Format.Bytes(drive.AvailableFreeSpace)} free / {Format.Bytes(drive.TotalSize)}", drive.Name.StartsWith("C:", StringComparison.OrdinalIgnoreCase)));
+                    var name = string.IsNullOrWhiteSpace(drive.VolumeLabel) ? "Local Disk" : drive.VolumeLabel;
+                    var kind = drive.DriveType == DriveType.Removable ? "removable" : "local";
+                    var engine = drive.DriveFormat == "NTFS" && drive.DriveType == DriveType.Fixed ? "Raw MFT with administrator scan" : "Directory scan";
+                    result.Add(new(drive.Name, $"{name} ({letter})", $"{drive.DriveFormat} · {kind}", drive.Name.StartsWith("C:", StringComparison.OrdinalIgnoreCase), drive.TotalSize - drive.TotalFreeSpace, drive.TotalSize, engine));
                 }
                 catch (IOException) { result.Add(new(drive.Name, drive.Name, "Unavailable")); }
                 catch (UnauthorizedAccessException) { result.Add(new(drive.Name, drive.Name, "Access denied")); }
@@ -113,8 +180,28 @@ public sealed class HomeViewModel : Bindable
         });
         SessionViewModel.Replace(Drives, rows);
         SessionViewModel.Replace(Profiles, session.Store.Profiles());
+        HistoryChanged();
     }
-    public void ChangedRoots() => Changed(nameof(ExtraRoots));
+    public void ChangedRoots()
+    {
+        Changed(nameof(ExtraRoots));
+        Changed(nameof(ScanButtonText));
+    }
+    public void Reset()
+    {
+    }
+    public Task RefreshAsync() => Task.CompletedTask;
+    /// <summary>Shows each drive's most recent snapshot state and switches between first-run and normal layouts.</summary>
+    public void HistoryChanged()
+    {
+        foreach (var drive in Drives)
+        {
+            var latest = session.History.FirstOrDefault(x => x.Roots.Any(root => Paths.Normalize(root).Equals(Paths.Normalize(drive.Path), StringComparison.OrdinalIgnoreCase)));
+            drive.LastState = latest?.Value.State ?? "";
+        }
+        Changed(nameof(IsFirstRun));
+        Changed(nameof(HasHistory));
+    }
     private void AddRoot()
     {
         var dialog = new OpenFolderDialog { Title = "Choose a drive, folder, or network share" };
@@ -124,6 +211,7 @@ public sealed class HomeViewModel : Bindable
     private string[] Roots() => Paths.DistinctRoots(Drives.Where(x => x.Selected).Select(x => Native.ResolveNetwork(x.Path)).Concat(Lines(ExtraRoots).Select(Native.ResolveNetwork)));
     private string[] Excluded() => Lines(Exclusions).Append(Path.GetDirectoryName(session.DatabasePath)!).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
     private static string[] Lines(string text) => text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    private readonly record struct ScanUpdate(string Text, string Engine, long Files, long Bytes, ScanProgress? Work);
     public async Task ScanAsync(string[]? rootsOverride = null)
     {
         if (session.Busy)
@@ -143,7 +231,30 @@ public sealed class HomeViewModel : Bindable
         var preferMft = PreferMft;
         var administrator = session.Administrator;
         var state = "Complete";
-        var progress = new Progress<string>(text => session.Status = text);
+        ScanTarget = roots.Length == 1 ? roots[0] : $"{roots.Length} roots";
+        ScanEngine = "";
+        ScanFiles = 0;
+        ScanBytes = "0 B";
+        ScanElapsed = "0:00";
+        ProgressKnown = false;
+        ProgressValue = 0;
+        ProgressText = "";
+        long bytes = 0;
+        scanStarted = DateTime.UtcNow;
+        clock.Start();
+        var progress = new Progress<ScanUpdate>(update =>
+        {
+            session.Status = update.Text;
+            ScanEngine = update.Engine.StartsWith("MFT", StringComparison.Ordinal) || update.Engine == "Raw MFT" ? "Raw MFT" : "Directory";
+            ScanFiles = update.Files;
+            ScanBytes = Format.Bytes(update.Bytes);
+            ProgressKnown = update.Work is { Total: > 0 };
+            if (update.Work is { Total: > 0 } work)
+            {
+                ProgressValue = 100d * work.Done / work.Total;
+                ProgressText = $"MFT records {work.Done / 2:N0} of {work.Total / 2:N0} · pass {(work.Done * 2 <= work.Total ? 1 : 2)} of 2";
+            }
+        });
         session.Status = "Starting scan…";
         try
         {
@@ -158,7 +269,10 @@ public sealed class HomeViewModel : Bindable
                     await session.WaitIfPausedAsync(token);
                     writer.AddBatch(snapshot, batch);
                     count += batch.Entries.LongLength;
-                    ((IProgress<string>)progress).Report($"{batch.Engine} · {count:N0} entries · {batch.Root}");
+                    foreach (var entry in batch.Entries)
+                        if (!entry.IsDirectory)
+                            bytes += entry.Length;
+                    ((IProgress<ScanUpdate>)progress).Report(new($"{batch.Engine} · {count:N0} entries · {batch.Root}", batch.Engine, count, bytes, batch.Progress));
                 }, token);
                 var aliases = new List<string>(64);
                 var aliasBytes = 0;
@@ -199,7 +313,7 @@ public sealed class HomeViewModel : Bindable
             {
                 await Task.Run(() => { using var writer = new IndexStore(database); writer.Finish(snapshot, state); });
             }
-            finally { session.EndWork(); }
+            finally { clock.Stop(); session.EndWork(); }
             session.OpenSnapshot(snapshot);
             await session.RefreshAsync();
             if (state == "Complete")

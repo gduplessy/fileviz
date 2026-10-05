@@ -28,12 +28,22 @@ public sealed class ParameterCommand(Action<object?> action, Func<bool>? canExec
     public void Execute(object? parameter) => action(parameter);
     public event EventHandler? CanExecuteChanged { add => CommandManager.RequerySuggested += value; remove => CommandManager.RequerySuggested -= value; }
 }
-public sealed class DriveRow(string path, string label, string detail, bool selected = false) : Bindable
+/// <summary>A drive or folder that can be scanned, with capacity when known.</summary>
+public sealed class DriveRow(string path, string label, string detail, bool selected = false, long used = 0, long total = 0, string engine = "") : Bindable
 {
     public string Path { get; } = path; public string Label { get; } = label; public string Detail { get; } = detail;
+    public string Engine { get; } = engine;
+    public bool HasCapacity => total > 0;
+    public double UsedPercent => total > 0 ? 100d * used / total : 0;
+    public bool NearlyFull => total > 0 && used > 0.85 * total;
+    public string UsageText => total > 0 ? $"{FileViz.Core.Format.Bytes(used)} of {FileViz.Core.Format.Bytes(total)}" : "";
     private bool chosen = selected; public bool Selected
     {
         get => chosen; set => Set(ref chosen, value);
+    }
+    private string lastState = ""; public string LastState
+    {
+        get => lastState; set => Set(ref lastState, value);
     }
 }
 public sealed record SnapshotRow(FileViz.Core.Snapshot Value)
@@ -42,4 +52,5 @@ public sealed record SnapshotRow(FileViz.Core.Snapshot Value)
     public string StartedText => DateTime.Parse(Value.Started).ToLocalTime().ToString("g");
     public string RootsText => string.Join(", ", System.Text.Json.JsonSerializer.Deserialize<string[]>(Value.Roots) ?? []);
     public string LogicalText => FileViz.Core.Format.Bytes(Value.Logical);
+    public string[] Roots => System.Text.Json.JsonSerializer.Deserialize<string[]>(Value.Roots) ?? [];
 }

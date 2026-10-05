@@ -17,7 +17,9 @@ public record FileEntry(string Path, string Parent, string Name, string? Identit
     public string ModifiedText => ModifiedTicks > 0 ? new DateTime(ModifiedTicks, DateTimeKind.Utc).ToLocalTime().ToString("g", CultureInfo.CurrentCulture) : "Unknown";
 }
 public record ScanError(string Path, string Message);
-public record ScanBatch(string Root, string Engine, FileEntry[] Entries, ScanError[] Errors, bool Restart = false);
+/// <summary>Work done and total for engines that know their extent (raw MFT records). Absent for directory enumeration.</summary>
+public record ScanProgress(long Done, long Total);
+public record ScanBatch(string Root, string Engine, FileEntry[] Entries, ScanError[] Errors, bool Restart = false, ScanProgress? Progress = null);
 public record Snapshot(long Id, string Roots, string Started, string State, long Files, long Logical, long? Allocated, long Errors);
 public record Summary(long Files, long Folders, long Logical, long Allocated, long UnknownAllocations, long Errors);
 public record Breakdown(string Name, long Bytes, long Count);

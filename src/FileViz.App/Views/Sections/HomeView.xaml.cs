@@ -11,6 +11,7 @@ public partial class HomeView : UserControl
         if (DataContext is HomeViewModel model && SnapshotsGrid.SelectedItem is SnapshotRow row && model.Session.CanInteract)
             model.Session.OpenSnapshot(row.Value.Id);
     }
+    private void ExtraRoots_LostFocus(object sender, System.Windows.RoutedEventArgs e) => ((HomeViewModel)DataContext).ChangedRoots();
     private void Snapshots_DoubleClick(object sender, MouseButtonEventArgs e) => Open();
     private void Snapshots_KeyDown(object sender, KeyEventArgs e)
     {
