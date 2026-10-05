@@ -1,1 +1,12 @@
-<Application x:Class="FileViz.App.App" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"><Application.Resources /></Application>
+<Application x:Class="FileViz.App.App" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" ThemeMode="System">
+ <Application.Resources>
+  <ResourceDictionary>
+   <ResourceDictionary.MergedDictionaries>
+    <!-- Loaded explicitly so FileViz styles can be BasedOn Fluent styles at parse time. ThemeMode keeps it in sync with light/dark. -->
+    <ResourceDictionary Source="pack://application:,,,/PresentationFramework.Fluent;component/Themes/Fluent.xaml"/>
+    <ResourceDictionary Source="Themes/Tokens.xaml"/>
+    <ResourceDictionary Source="Themes/Controls.xaml"/>
+   </ResourceDictionary.MergedDictionaries>
+  </ResourceDictionary>
+ </Application.Resources>
+</Application>

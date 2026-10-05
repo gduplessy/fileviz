@@ -1,5 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup><OutputType>WinExe</OutputType><UseWPF>true</UseWPF><AssemblyName>FileViz</AssemblyName><ApplicationManifest>app.manifest</ApplicationManifest></PropertyGroup>
+  <PropertyGroup><OutputType>WinExe</OutputType><UseWPF>true</UseWPF><AssemblyName>FileViz</AssemblyName><ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Application.ThemeMode (Fluent theme, Mica, light/dark switching) is still marked experimental in .NET 10. Revisit on each .NET update. -->
+    <NoWarn>$(NoWarn);WPF0001</NoWarn>
+  </PropertyGroup>
   <ItemGroup><ProjectReference Include="../FileViz.Data/FileViz.Data.csproj" /><ProjectReference Include="../FileViz.Windows/FileViz.Windows.csproj" /><ProjectReference Include="../FileViz.Worker/FileViz.Worker.csproj" ReferenceOutputAssembly="false" /></ItemGroup>
   <Target Name="CopyWorker" AfterTargets="Build"><ItemGroup><WorkerFiles Include="$(MSBuildThisFileDirectory)../FileViz.Worker/bin/$(Configuration)/$(TargetFramework)/*.*" /></ItemGroup><Copy SourceFiles="@(WorkerFiles)" DestinationFolder="$(TargetDir)worker" SkipUnchangedFiles="true" /></Target>
 </Project>

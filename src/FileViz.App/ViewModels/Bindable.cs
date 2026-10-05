@@ -22,6 +22,12 @@ public sealed class ActionCommand(Action action, Func<bool>? canExecute = null) 
     public void Execute(object? parameter) => action();
     public event EventHandler? CanExecuteChanged { add => CommandManager.RequerySuggested += value; remove => CommandManager.RequerySuggested -= value; }
 }
+public sealed class ParameterCommand(Action<object?> action, Func<bool>? canExecute = null) : ICommand
+{
+    public bool CanExecute(object? parameter) => canExecute?.Invoke() ?? true;
+    public void Execute(object? parameter) => action(parameter);
+    public event EventHandler? CanExecuteChanged { add => CommandManager.RequerySuggested += value; remove => CommandManager.RequerySuggested -= value; }
+}
 public sealed class DriveRow(string path, string label, string detail, bool selected = false) : Bindable
 {
     public string Path { get; } = path; public string Label { get; } = label; public string Detail { get; } = detail;
@@ -33,4 +39,7 @@ public sealed class DriveRow(string path, string label, string detail, bool sele
 public sealed record SnapshotRow(FileViz.Core.Snapshot Value)
 {
     public string Label => $"#{Value.Id} · {Value.State} · {DateTime.Parse(Value.Started).ToLocalTime():g} · {Value.Files:N0} files";
+    public string StartedText => DateTime.Parse(Value.Started).ToLocalTime().ToString("g");
+    public string RootsText => string.Join(", ", System.Text.Json.JsonSerializer.Deserialize<string[]>(Value.Roots) ?? []);
+    public string LogicalText => FileViz.Core.Format.Bytes(Value.Logical);
 }

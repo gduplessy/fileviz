@@ -21,7 +21,7 @@ public sealed class Treemap : FrameworkElement
         var values = Items?.Where(x => x.Bytes > 0).Take(100).OrderByDescending(x => x.Bytes).ToArray() ?? [];
         if (values.Length == 0)
         {
-            dc.DrawRectangle(new SolidColorBrush(Color.FromRgb(225, 230, 237)), null, new Rect(0, 0, ActualWidth, ActualHeight));
+            dc.DrawRectangle(TryFindResource("SubtleFillColorSecondaryBrush") as Brush ?? Brushes.Transparent, null, new Rect(0, 0, ActualWidth, ActualHeight));
             return;
         }
         Layout(values, 0, values.Length, new Rect(0, 0, ActualWidth, ActualHeight));
