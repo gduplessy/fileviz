@@ -1,0 +1,29 @@
+{
+  "Version": "0.3.1",
+  "SourceVersion": "0.3.1+8ec61e967aecef58489e27cef066a036e9c369b7",
+  "ChecksumsVerified": true,
+  "DeveloperRuntimeRemovedFromEnvironment": true,
+  "InstallerTested": true,
+  "Portable": {
+    "Status": "Duplicate analysis complete. Cleanup performs fresh byte and stream verification.",
+    "SummaryText": "304 files · 39.63 MiB logical · 39.38 MiB reported allocation",
+    "Rows": 250,
+    "DuplicateRows": 2,
+    "PeakWorkingSet": 218447872,
+    "Snapshots": 4,
+    "Errors": 0,
+    "RebuiltSavedInventory": true,
+    "DuplicateActivityValidated": true,
+    "DuplicateScopeValidated": true,
+    "PhotosValidated": true,
+    "RenderedVisibleWindow": true
+  },
+  "SmokeExitCode": 0,
+  "ValidatedUtc": "2026-10-06T13:23:39.1083218Z",
+  "InstallerExitCode": 0,
+  "InstallerValidatedUtc": "2026-10-06T13:24:43.3178356Z",
+  "UninstallerTested": false,
+  "ReleaseWorkflow": "https://github.com/gduplessy/fileviz/actions/runs/37469703702",
+  "InstalledVersion": "0.3.1+8ec61e967aecef58489e27cef066a036e9c369b7",
+  "RegressionTestsPassed": 68
+}
