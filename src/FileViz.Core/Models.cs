@@ -33,8 +33,8 @@ public record HashResult(string Path, string? Hash, string? Identity, long Lengt
 public record HashProgress(string Path, long BytesRead, long TotalBytes);
 public record DuplicateProgress(string Phase, long Completed = 0, long? Total = null, long BytesRead = 0,
     long Cached = 0, long Errors = 0, HashProgress? CurrentFile = null);
-public record WorkerRequest(string Operation, ScanScope[]? Scopes = null, HashRequest[]? Hashes = null, string[]? MetadataPaths = null);
-public record WorkerMessage(string Kind, ScanBatch? Batch = null, HashResult? Hash = null, string? Text = null, FileEntry? Entry = null, string? Path = null, HashProgress? HashProgress = null);
+public record WorkerRequest(string Operation, ScanScope[]? Scopes = null, HashRequest[]? Hashes = null, string[]? MetadataPaths = null, PhotoRequest[]? Photos = null);
+public record WorkerMessage(string Kind, ScanBatch? Batch = null, HashResult? Hash = null, string? Text = null, FileEntry? Entry = null, string? Path = null, HashProgress? HashProgress = null, PhotoInfo? Photo = null);
 public record QueryFilter(string Search = "", string Extension = "", long MinimumSize = 0, long? ModifiedAfter = null, uint RequiredAttributes = 0, string? Parent = null, bool Allocated = false, string? Root = null);
 public record Difference(string Path, string Change, long Before, long After)
 {

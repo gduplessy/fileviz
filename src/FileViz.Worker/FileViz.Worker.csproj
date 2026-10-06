@@ -1,1 +1,1 @@
-<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType></PropertyGroup><ItemGroup><ProjectReference Include="../FileViz.Windows/FileViz.Windows.csproj" /></ItemGroup></Project>
+<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><UseWPF>true</UseWPF></PropertyGroup><ItemGroup><ProjectReference Include="../FileViz.Windows/FileViz.Windows.csproj" /></ItemGroup></Project>

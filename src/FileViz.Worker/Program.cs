@@ -1,4 +1,5 @@
 using System.IO.Pipes;
+using System.IO;
 using System.Security.Principal;
 using FileViz.Core;
 using FileViz.Windows;
@@ -52,6 +53,10 @@ try
                         Wire.WriteAsync(pipe, new WorkerMessage("hash-progress", HashProgress: update)));
                     await Wire.WriteAsync(pipe, new WorkerMessage("hash", Hash: result));
                 }
+            }
+            else if (request.Operation is "photo" or "photo-preview" && request.Photos is { Length: 1 } photos)
+            {
+                await Wire.WriteAsync(pipe, new WorkerMessage("photo", Photo: FileViz.Worker.PhotoReader.Read(photos[0], request.Operation == "photo-preview")));
             }
             else if (request.Operation == "metadata" && request.MetadataPaths is { Length: > 0 and <= 64 } paths)
             {

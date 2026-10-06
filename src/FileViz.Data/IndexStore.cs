@@ -43,6 +43,7 @@ public sealed partial class IndexStore : IDisposable
 
         """);
         EnsureCompositionSchema();
+        EnsurePhotoSchema();
     }
     public void RecoverInterrupted() => Execute("UPDATE snapshots SET state='Interrupted' WHERE state='Scanning';");
     private void ConfigureIndexMemoryBudget()
