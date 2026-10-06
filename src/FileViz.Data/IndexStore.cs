@@ -21,7 +21,9 @@ public sealed partial class IndexStore : IDisposable
         Directory.CreateDirectory(System.IO.Path.GetDirectoryName(DatabasePath)!);
         connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = DatabasePath, Mode = SqliteOpenMode.ReadWriteCreate, Pooling = false }.ToString());
         connection.Open();
-        Execute("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA cache_size=-32768; PRAGMA temp_store=FILE; PRAGMA busy_timeout=5000; PRAGMA wal_autocheckpoint=10000; PRAGMA foreign_keys=ON;");
+        // Schema commits must not checkpoint a large WAL left by a previous run
+        // before the desktop window exists. Restore normal checkpointing afterwards.
+        Execute("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA cache_size=-32768; PRAGMA temp_store=FILE; PRAGMA busy_timeout=5000; PRAGMA wal_autocheckpoint=0; PRAGMA foreign_keys=ON;");
         // Windows SQLite defaults TEMP to just 2 MiB. Large alias/parent aggregates
         // otherwise thrash that cache even though the main database cache is bounded.
         ConfigureIndexMemoryBudget();
@@ -44,8 +46,16 @@ public sealed partial class IndexStore : IDisposable
         """);
         EnsureCompositionSchema();
         EnsurePhotoSchema();
+        Execute("PRAGMA wal_autocheckpoint=10000;");
     }
-    public void RecoverInterrupted() => Execute("UPDATE snapshots SET state='Interrupted' WHERE state='Scanning';");
+    public void RecoverInterrupted()
+    {
+        // Recovery is also performed before the window exists. Keep its small
+        // status update from draining a previous run's entire WAL synchronously.
+        Execute("PRAGMA wal_autocheckpoint=0;");
+        try { Execute("UPDATE snapshots SET state='Interrupted' WHERE state='Scanning';"); }
+        finally { Execute("PRAGMA wal_autocheckpoint=10000;"); }
+    }
     private void ConfigureIndexMemoryBudget()
     {
         var large = new FileInfo(DatabasePath).Length >= 1024L * 1024 * 1024;
