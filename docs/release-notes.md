@@ -1,37 +1,20 @@
-# FileViz 0.2.3 preview
+# FileViz 0.2.4 preview
 
-Fixes excessive finalization time on drives with many nested directories.
+Duplicate analysis now shows activity throughout candidate preparation, sampling, full hashing, and result publication.
 
 ## Changes
 
-- Build folder ranking indexes after aggregation, provision bounded SQLite caches for large inventories, and avoid repeating the entire type-classification mapping for each category sum.
-- MFTs with more than one million records permit up to two million directory ancestors / estimated 384 MiB, instead of always falling back at 250,000. This raises the bounded ancestry allowance; large-volume combined memory and live raw throughput remain unverified.
+- A dedicated activity card appears immediately with the current phase, elapsed time, stage file counts, actual bytes read, cache hits, and errors. Large files report their current byte progress.
+- SQLite execution sends activity updates during long candidate queries. Waiting for the next work update is shown explicitly; elapsed time alone is never presented as proof of progress.
+- Cancel analysis interrupts executing database statements and disconnects the read-only worker. Interrupted publication rolls back and retains the last completed duplicate groups.
+- Metadata revalidation runs in the isolated worker so blocked filesystem providers stay cancellable. Cache reuse still checks identity, size, modified time, and change time.
+- Single-snapshot preparation avoids unnecessary latest-history lookups. Samples and name matches still never prove duplicate content or authorize cleanup.
+- Completed, cancelled, and failed states replace the stale scan status. Progress percentages apply only to the current stage; preparation and grouping remain indeterminate.
 
-- Treemap child lookups and drive allocated-folder rankings use indexed seeks; first navigation also prepares these indexes for saved snapshots from earlier versions.
+## Packages and validation
 
-- Folder initialization reads saved roots and indexed directory rows rather than sorting the entire inventory. Progress now identifies initialization, allocation owners, direct totals, and every rollup depth.
-- SQLite view failures preserve a failed, retryable snapshot and display the failure; a disposable trigger test verifies successful recovery after the failure is removed.
+Download the per-user `FileViz-0.2.4-win-x64-setup.exe` or extract the complete `FileViz-0.2.4-win-x64-portable.zip`. Both include the runtime and matching worker. Verify against `SHA256SUMS.txt`.
 
-- Replace quadratic folder and type/age rollups with indexed temporary aggregates. A CPU trace of a six-hour real-volume operation identified repeated folder aggregation scans as the defect.
-- Cancel now interrupts executing SQLite finalization statements and retains the saved inventory.
-- **Rebuild saved views** recovers interrupted, cancelled, or failed snapshots without scanning their folders again. Original coverage labels remain visible.
-- Recovery supports an explicit local database path and snapshot ID. Existing file inventory, hard-link accounting, and unknown allocation semantics are preserved.
+63 regression tests pass, including actual worker read-byte messages, executing-query cancellation, and rollback of cancelled result publication. The visible desktop smoke exercises immediate activity, cache reuse, cancellation, and retained results on disposable files. No throughput claim is made for large live drives or shares.
 
-## Download
-
-- **Installer:** `FileViz-0.2.3-win-x64-setup.exe`, per-user installation.
-- **Portable:** `FileViz-0.2.3-win-x64-portable.zip`, extract the whole archive and launch `FileViz.exe`.
-- **Verify:** compare the package with the attached `SHA256SUMS.txt`.
-
-Close an old FileViz process before upgrading: replacing its binaries cannot patch an already-running aggregation. Upgrades preserve snapshots. After interruption, use Home's **Rebuild saved views** instead of starting another drive scan. Preserve a closed database and its matching WAL before recovery.
-
-## Verification and limits
-
-- Complete 0.2.3 branching fixture: 100,000 files / 200,000 folders finalized in 23.89 seconds, 137.66 MiB process peak, including navigation indexes. This synthetic metadata benchmark is not full-drive throughput. [Evidence](https://github.com/gduplessy/fileviz/blob/main/docs/evidence/folder-rollup-0.2.3.json).
-
-- Release build: zero warnings/errors; all 59 regression tests passed.
-- Branching metadata fixture, 8,000 files / 16,000 folders: finalization 55.19 → 5.66 seconds. Patched 100,000 files / 200,000 folders: 33.29 seconds, 123.43 MiB peak working set. Single runs under shared load; no end-to-end scan speed claim. [Evidence](https://github.com/gduplessy/fileviz/blob/main/docs/evidence/folder-rollup-0.2.2.json).
-- Disposable tests verify hard-link allocation once per identity, unknown allocation, empty folders, repeat rebuilds, and actual executing-query cancellation within two seconds.
-- A visible desktop fixture confirms recovery uses saved inventory even when new files exist on disk, preserves interrupted coverage, and displays usable file/treemap/duplicate views.
-
-Packages remain unsigned previews. Large index construction can still take time, raw MFT can fall back to directory enumeration, and the raw 2x target and full provider matrix remain unmet or unverified. See [performance](https://github.com/gduplessy/fileviz/blob/main/docs/performance.md) and [validation](https://github.com/gduplessy/fileviz/blob/main/docs/validation.md). No telemetry, automatic updates, or automatic deletion.
+Close the previous process before upgrading. Existing snapshots and previously completed duplicate results are preserved; an unfinished analysis must be restarted with the new version. Preview quality; no telemetry, automatic updates, or automatic deletion.

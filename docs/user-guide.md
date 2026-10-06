@@ -31,6 +31,8 @@ The default scope is the current root; **Compare across selected roots** spans d
 
 Each group card shows its evidence, size, and copies. Choose one copy to **Keep** and tick **Remove** on the others; a keeper can never be removed, and choices are kept as you page through groups. A preferred keeper folder influences suggested keepers on the next analysis; suggestions never select removals.
 
+While analysis runs, the activity card shows preparation, sampling, full hashing, and result grouping. File counts and percentages apply to the current stage; database preparation is indeterminate until its candidate count is known. Bytes show actual reads, including sampled blocks; cached hashes count separately. The current file, elapsed time, and age of the last work update distinguish active reads from waiting for a provider or database operation. **Cancel analysis** stops the worker and interrupts SQLite; the last completed result remains available. Completion, cancellation, and errors appear explicitly on the card and status bar.
+
 ## Review and quarantine
 
 **Review removals** (or **Review for cleanup** in Explorer) opens the review window. FileViz prechecks every selected file without moving anything: identity, size and timestamps, and for duplicates the bytes and every named stream against the keeper. Files that fail are listed as blocked with the reason and stay in place. **Quarantine** moves only the files that passed, and each move revalidates under read locks. Protected system and application locations, reparse points, and placeholders are blocked.

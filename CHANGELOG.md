@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.4 — preview
+
+- Show duplicate-analysis activity immediately: database phases, stage counts, actual bytes read, current file, cache hits, errors, elapsed time, and the age of the last work update.
+- Add Cancel analysis, native SQLite interruption, and transactional result publication that preserves previous groups on cancellation.
+- Revalidate cached metadata in the isolated worker; avoid redundant latest-history lookup for single-snapshot preparation.
+- Display explicit complete, cancelled, and failed states. Validate worker progress, database cancellation, cache reuse, and rendered desktop activity with 63 passing regressions and disposable UI fixtures.
+
 ## 0.2.3 — preview
 
 - Defer folder ranking indexes until totals are computed, use bounded main/temporary SQLite caches suited to database size, and classify file types with constant extension sets. Verify SQL category and age totals against the core classifier for every known extension.

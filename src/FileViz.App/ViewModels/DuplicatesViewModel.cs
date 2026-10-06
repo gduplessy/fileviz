@@ -96,7 +96,7 @@ public sealed class DuplicatesViewModel : Bindable, ISnapshotSection
     private string analysisHeading = "Duplicate analysis";
     public string AnalysisHeading => analysisHeading;
     public string ActivityPhase => activity.Phase;
-    public string ActivityCounts => $"{(activity.Total is long total ? $"{activity.Completed:N0} / {total:N0} files" : "File total pending")} · {Format.Bytes(activity.BytesRead)} read · {activity.Cached:N0} cached · {activity.Errors:N0} errors";
+    public string ActivityCounts => $"{(activity.Total is long total ? $"{activity.Completed:N0} / {total:N0} files" : activity.Completed > 0 ? $"{activity.Completed:N0} files processed" : "File total pending")} · {Format.Bytes(activity.BytesRead)} read · {activity.Cached:N0} cached · {activity.Errors:N0} errors";
     public string ActivityFile => activity.CurrentFile?.Path ?? "";
     public string FileProgressText => activity.CurrentFile is { TotalBytes: > 0 } file ? $"Current file: {Format.Bytes(file.BytesRead)} / {Format.Bytes(file.TotalBytes)}" : "";
     public string ActivityElapsed => "Elapsed " + Format.Elapsed(elapsed.Elapsed);

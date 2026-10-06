@@ -21,7 +21,7 @@ public static class DuplicateCoordinator
         using var store = new IndexStore(database);
         using var observation = store.ObserveDuplicateWork(phase =>
         {
-            current = current with { Phase = phase, CurrentFile = null };
+            current = current with { Phase = phase, Total = null, CurrentFile = null };
             Report(true);
         }, token);
         try
