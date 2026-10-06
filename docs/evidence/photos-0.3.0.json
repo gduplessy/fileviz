@@ -1,0 +1,22 @@
+{
+  "Fixture": "Generated disposable PNG/JPEG images and malformed image data",
+  "PhotoCandidates": 5,
+  "LowResolutionMatches": 2,
+  "UnreadableImages": 1,
+  "ManualQuarantineAndRestoreVerified": true,
+  "RegressionTestsPassed": 67,
+  "Desktop": {
+    "Status": "Duplicate analysis complete. Cleanup performs fresh byte and stream verification.",
+    "SummaryText": "2 files · 56 B logical · 64 B reported allocation",
+    "Rows": 2,
+    "DuplicateRows": 2,
+    "PeakWorkingSet": 195715072,
+    "Snapshots": 4,
+    "Errors": 0,
+    "RebuiltSavedInventory": false,
+    "DuplicateActivityValidated": true,
+    "DuplicateScopeValidated": true,
+    "PhotosValidated": true,
+    "RenderedVisibleWindow": true
+  }
+}

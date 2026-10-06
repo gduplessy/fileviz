@@ -35,6 +35,18 @@ Each group card shows its evidence, size, and copies. Choose one copy to **Keep*
 
 While analysis runs, the activity card shows preparation, sampling, full hashing, and result grouping. File counts and percentages apply to the current stage; database preparation is indeterminate until its candidate count is known. Bytes show actual reads, including sampled blocks; cached hashes count separately. The current file, elapsed time, and age of the last work update distinguish active reads from waiting for a provider or database operation. **Cancel analysis** stops the worker and interrupts SQLite; the last completed result remains available. Completion, cancellation, and errors appear explicitly on the card and status bar.
 
+## Photos
+
+Open **Photos** (Ctrl+7), choose a saved **Drive or folder**, and click **Analyze photos**. Image dimensions are read on demand in an isolated worker; ordinary drive scans stay metadata-only. JPEG, PNG, GIF, BMP, and TIFF use Windows imaging codecs; WebP, HEIC/HEIF, AVIF, and other listed formats require a compatible installed codec. Unsupported, corrupt, inaccessible, changing, and timed-out images appear under **Show unreadable / unsupported images** and cannot be selected for removal. Reparse points and cloud placeholders are skipped without requesting hydration.
+
+Set **Minimum short edge** (720 pixels by default) and/or **Minimum megapixels**. A photo matches if it falls below either enabled threshold; zero disables a threshold. Short-edge filtering treats portrait and landscape equally. **Apply filters** updates the cached results; name/path filtering narrows them further. GIF/multipage dimensions use the maximum width and height across frames, conservatively avoiding thumbnail-sized first pages. These thresholds measure resolution, not blur, compression artifacts, or whether an image is valuable.
+
+Select a row and **Load preview** or **Show in Explorer** to inspect it. Previews show the first frame and are limited to 512 pixels on the long edge, images up to 25 megapixels, and files up to 64 MiB. Larger originals remain analyzable but should be reviewed in Explorer. EXIF orientation is not applied by the preview; resolution filtering remains orientation-independent.
+
+Tick **Remove** individually or **Select this page**, then **Review removals**. Nothing is selected automatically. Choices persist across 100-row pages, with a limit of 5,000 selections per review; changing scope or filters clears them. Photo cleanup is an explicit manual selection, with fresh identity/timestamp checks rather than duplicate keeper comparisons. Changed files and protected locations are blocked. Same-volume quarantine and journaled restore preserve the originals; the selected byte total is logical size, not guaranteed reclaimed allocation, especially for hard-link aliases.
+
+The activity card shows phase, counts, current file, elapsed time, and the age of the last update. Cancel retains completed metadata and leaves originals untouched. Re-analysis revalidates identity/change metadata before cache reuse. Reopened cached results may be stale or partial; cleanup always checks again.
+
 ## Review and quarantine
 
 **Review removals** (or **Review for cleanup** in Explorer) opens the review window. FileViz prechecks every selected file without moving anything: identity, size and timestamps, and for duplicates the bytes and every named stream against the keeper. Files that fail are listed as blocked with the reason and stay in place. **Quarantine** moves only the files that passed, and each move revalidates under read locks. Protected system and application locations, reparse points, and placeholders are blocked.
@@ -59,7 +71,7 @@ Quarantine retains disk space. The Windows Recycle Bin request displays Windows 
 
 Settings holds the app theme (follows Windows by default), the default map coloring, scan defaults (prefer raw MFT, administrator scan, default exclusions), saved profiles, the default hash algorithm and preferred keeper folder, and storage details. Settings are saved in the index database. The accent color follows your Windows accent color.
 
-Keyboard: F5 scan, Esc cancel, Alt+Up up one level, Ctrl+E export, Ctrl+F search, Ctrl+1 to Ctrl+6 switch sections, F6 and Shift+F6 move between the navigation pane, the section, and search. Controls have accessible names, the space map announces the selected tile, and High Contrast themes are followed. Per-monitor DPI scaling is enabled.
+Keyboard: F5 scan, Esc cancel, Alt+Up up one level, Ctrl+E export, Ctrl+F search, Ctrl+1 to Ctrl+7 switch sections, F6 and Shift+F6 move between the navigation pane, the section, and search. Controls have accessible names, the space map announces the selected tile, and High Contrast themes are followed. Per-monitor DPI scaling is enabled.
 
 ## Privacy and storage
 

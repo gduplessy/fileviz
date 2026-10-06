@@ -17,6 +17,7 @@
   <KeyBinding Key="D4" Modifiers="Control" Command="{Binding GoCommand}" CommandParameter="3"/>
   <KeyBinding Key="D5" Modifiers="Control" Command="{Binding GoCommand}" CommandParameter="4"/>
   <KeyBinding Key="D6" Modifiers="Control" Command="{Binding GoCommand}" CommandParameter="5"/>
+  <KeyBinding Key="D7" Modifiers="Control" Command="{Binding GoCommand}" CommandParameter="6"/>
  </Window.InputBindings>
  <Window.CommandBindings>
   <CommandBinding Command="{x:Static ApplicationCommands.Find}" Executed="Find_Executed"/>
@@ -25,6 +26,7 @@
   <DataTemplate DataType="{x:Type vm:HomeViewModel}"><sections:HomeView/></DataTemplate>
   <DataTemplate DataType="{x:Type vm:ExplorerViewModel}"><sections:ExplorerView/></DataTemplate>
   <DataTemplate DataType="{x:Type vm:DuplicatesViewModel}"><sections:DuplicatesView/></DataTemplate>
+  <DataTemplate DataType="{x:Type vm:PhotosViewModel}"><sections:PhotosView/></DataTemplate>
   <DataTemplate DataType="{x:Type vm:CompareViewModel}"><sections:CompareView/></DataTemplate>
   <DataTemplate DataType="{x:Type vm:CleanupViewModel}"><sections:CleanupView/></DataTemplate>
   <DataTemplate DataType="{x:Type vm:DiagnosticsViewModel}"><sections:DiagnosticsView/></DataTemplate>

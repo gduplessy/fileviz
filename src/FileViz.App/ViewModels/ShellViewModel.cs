@@ -46,6 +46,7 @@ public sealed class ShellViewModel : Bindable, IDisposable
     {
         get;
     }
+    public PhotosViewModel Photos { get; }
     public CompareViewModel Compare
     {
         get;
@@ -96,6 +97,7 @@ public sealed class ShellViewModel : Bindable, IDisposable
         Cleanup = new(Session);
         Explorer = new(Session, Cleanup);
         Duplicates = new(Session, Cleanup);
+        Photos = new(Session, Cleanup);
         Compare = new(Session);
         Diagnostics = new(Session);
         Settings = new(Session, Home, Explorer, Duplicates);
@@ -105,6 +107,7 @@ public sealed class ShellViewModel : Bindable, IDisposable
         Session.Register(Compare);
         Session.Register(Cleanup);
         Session.Register(Diagnostics);
+        Session.Register(Photos);
         NavItems =
         [
             new(this, "Home", "", Home, false, "Ctrl+1"),
@@ -113,6 +116,7 @@ public sealed class ShellViewModel : Bindable, IDisposable
             new(this, "Compare", "", Compare, true, "Ctrl+4"),
             new(this, "Cleanup", "", Cleanup, false, "Ctrl+5"),
             new(this, "Diagnostics", "", Diagnostics, true, "Ctrl+6"),
+            new(this, "Photos", "", Photos, true, "Ctrl+7"),
         ];
         SettingsNav = new(this, "Settings", "", Settings, false, "");
         selectedNav = NavItems[0];
@@ -152,5 +156,5 @@ public sealed class ShellViewModel : Bindable, IDisposable
             SelectedNav = NavItems[1];
         }
     }
-    public void Dispose() => Session.Dispose();
+    public void Dispose() { Photos.Dispose(); Session.Dispose(); }
 }

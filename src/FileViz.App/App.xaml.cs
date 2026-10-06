@@ -13,8 +13,23 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
-        DispatcherUnhandledException += (_, args) => { MessageBox.Show(args.Exception.Message, "FileViz", MessageBoxButton.OK, MessageBoxImage.Error); args.Handled = true; };
         var smoke = e.Args.Length == 3 && e.Args[0] == "--smoke";
+        var handlingFailure = false;
+        DispatcherUnhandledException += (_, args) =>
+        {
+            args.Handled = true;
+            if (smoke)
+            {
+                File.WriteAllText(Path.Combine(Path.GetFullPath(e.Args[2]), "smoke-error.txt"), args.Exception.ToString());
+                Shutdown(1);
+                return;
+            }
+            // A modal error pumps layout again; a failing template must not recursively open dialogs.
+            if (handlingFailure) { Shutdown(1); return; }
+            handlingFailure = true;
+            try { MessageBox.Show(args.Exception.Message, "FileViz", MessageBoxButton.OK, MessageBoxImage.Error); }
+            finally { handlingFailure = false; }
+        };
         if (!smoke)
         {
             var wait = Array.IndexOf(e.Args, "--wait-parent");
@@ -227,6 +242,83 @@ public partial class App : Application
                     await Capture(ThemeMode.Dark, "section-compare-result-dark.png");
                     await window.Model.Duplicates.FindDuplicatesAsync();
                 }
+                var photos = Environment.GetEnvironmentVariable("FILEVIZ_SMOKE_PHOTOS") == "1";
+                if (photos)
+                {
+                    void PhotoStage(string stage) => File.AppendAllText(Path.Combine(Path.GetFullPath(e.Args[2]), "photo-stages.txt"), stage + Environment.NewLine);
+                    PhotoStage("Preparing disposable image fixture");
+                    var original = window.Model.Session.Active;
+                    var photoRoot = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(e.Args[1]))!, "photo-fixture");
+                    Directory.CreateDirectory(photoRoot);
+                    void WriteImage(string name, int width, int height)
+                    {
+                        var drawing = new DrawingVisual();
+                        using (var context = drawing.RenderOpen())
+                        {
+                            context.DrawRectangle(new LinearGradientBrush(Colors.DarkSlateBlue, Colors.Teal, 45), null, new Rect(0, 0, width, height));
+                            context.DrawEllipse(Brushes.Gold, null, new Point(width * .75, height * .3), width * .12, width * .12);
+                            context.DrawRectangle(Brushes.DarkSlateGray, null, new Rect(0, height * .7, width, height * .3));
+                        }
+                        var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32); bitmap.Render(drawing);
+                        System.Windows.Media.Imaging.BitmapEncoder encoder = name.EndsWith(".jpg", StringComparison.Ordinal) ? new System.Windows.Media.Imaging.JpegBitmapEncoder() : new System.Windows.Media.Imaging.PngBitmapEncoder();
+                        encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
+                        using var file = File.Create(Path.Combine(photoRoot, name)); encoder.Save(file);
+                    }
+                    WriteImage("landscape-small.png", 400, 300);
+                    WriteImage("portrait-small.jpg", 320, 900);
+                    WriteImage("boundary.png", 1280, 720);
+                    WriteImage("large.png", 1600, 1200);
+                    File.WriteAllText(Path.Combine(photoRoot, "unreadable.png"), "Not an image; must never become a removal candidate.");
+                    await window.Model.Home.ScanAsync([photoRoot]);
+                    PhotoStage("Photo inventory scanned");
+                    window.Model.SelectedNav = window.Model.NavItems.First(x => x.Label == "Photos");
+                    PhotoStage("Photos navigation selected");
+                    var model = window.Model.Photos;
+                    await model.AnalyzeAsync();
+                    PhotoStage("Photo dimensions analyzed");
+                    if (model.Photos.Count != 2 || model.Photos.Any(x => x.Photo.ShortEdge >= 720) || model.BuildSelections().Length != 0)
+                        throw new InvalidOperationException("Photo thresholds must respect orientation and never select removals automatically.");
+                    model.MinimumMegapixels = "1"; model.ApplyFilter(); await model.RefreshAsync();
+                    if (model.Photos.Count != 3) throw new InvalidOperationException("Either enabled photo threshold must select the boundary image.");
+                    model.MinimumMegapixels = "0"; model.Search = "landscape"; model.ApplyFilter(); await model.RefreshAsync();
+                    if (model.Photos.Count != 1) throw new InvalidOperationException("Photo name/path filtering must narrow resolution matches.");
+                    model.Search = ""; model.ApplyFilter(); await model.RefreshAsync();
+                    model.Selected = model.Photos.First(x => x.Name == "portrait-small.jpg");
+                    await model.LoadPreviewAsync();
+                    PhotoStage("Preview loaded");
+                    if (model.Preview == null || Math.Max(model.Preview.PixelWidth, model.Preview.PixelHeight) > 512)
+                        throw new InvalidOperationException("Photo preview must be bounded and rendered.");
+                    model.Selected.Remove = true;
+                    await Capture(ThemeMode.Light, "photos-review.png");
+                    await Capture(ThemeMode.Dark, "photos-review-dark.png");
+                    var selections = model.BuildSelections();
+                    var review = new FileViz.App.ViewModels.ReviewViewModel(selections);
+                    await review.CheckAsync(CancellationToken.None);
+                    if (review.ReadySelections.Length != 1 || selections[0].Keeper != null)
+                        throw new InvalidOperationException("Photo removal must use explicit manual cleanup prechecks.");
+                    model.ErrorsOnly = true; await model.RefreshAsync();
+                    if (model.Photos.Count != 1 || model.Photos[0].CanRemove) throw new InvalidOperationException("Unreadable photos must stay unselectable.");
+                    model.ErrorsOnly = false; await model.RefreshAsync();
+                    // Cancelling a repeated analysis retains cached work and restores controls.
+                    var analysis = model.AnalyzeAsync();
+                    if (!model.IsAnalyzing || !model.HasActivity || !window.Model.Session.Busy) throw new InvalidOperationException("Photo analysis must show immediate activity.");
+                    var activePhotoScope = model.SelectedScope;
+                    model.SelectedScope = model.AvailableScopes.First(x => x.Snapshot == original);
+                    if (model.SelectedScope != activePhotoScope) throw new InvalidOperationException("Photo scope edits must be blocked while busy.");
+                    window.Model.Session.CancelCommand.Execute(null); await analysis;
+                    if (model.IsAnalyzing || window.Model.Session.Busy || model.Photos.Count != 2) throw new InvalidOperationException("Photo cancellation must retain completed results.");
+                    model.Selected = model.Photos[0]; model.Selected.Remove = true;
+                    var selected = model.BuildSelections();
+                    var previousBytes = File.ReadAllBytes(selected[0].Target.Path);
+                    await window.Model.Cleanup.CleanupAsync(selected);
+                    var moved = window.Model.Cleanup.CleanupHistory.First(x => x.Original == selected[0].Target.Path && x.State == "Quarantined");
+                    window.Model.Cleanup.Restore(moved);
+                    if (!File.ReadAllBytes(selected[0].Target.Path).SequenceEqual(previousBytes)) throw new InvalidOperationException("Disposable photo restore must retain all original bytes.");
+                    model.SelectedScope = model.AvailableScopes.First(x => x.Snapshot == original);
+                    await window.Model.Session.RefreshAsync();
+                    if (model.Photos.Count != 0 || window.Model.SelectedNav.Label != "Photos") throw new InvalidOperationException("Photo scope selection must isolate cached matches without leaving Photos.");
+                    await window.Model.Duplicates.FindDuplicatesAsync();
+                }
                 File.WriteAllText(Path.Combine(Path.GetFullPath(e.Args[2]), "smoke.json"), System.Text.Json.JsonSerializer.Serialize(new
                 {
                     window.Model.Session.Status,
@@ -239,6 +331,7 @@ public partial class App : Application
                     RebuiltSavedInventory = rebuilt,
                     DuplicateActivityValidated = duplicateActivity,
                     DuplicateScopeValidated = duplicateScope,
+                    PhotosValidated = photos,
                     RenderedVisibleWindow = true
                 }));
                 Shutdown(window.Model.Explorer.Files.Count > 0 && window.Model.Diagnostics.Errors.Count == 0 && window.Model.Duplicates.Duplicates.Count >= 2 ? 0 : 1);
