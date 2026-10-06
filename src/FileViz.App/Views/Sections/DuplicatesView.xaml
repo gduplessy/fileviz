@@ -18,7 +18,7 @@
     </Border>
     <Button Style="{StaticResource SubtleButton}" Content="Find name matches" Command="{Binding NameCommand}" Margin="0,0,8,0" ToolTip="Fast, but names never prove two files are the same"/>
     <Button Style="{StaticResource AccentButtonStyle}" Command="{Binding DuplicateCommand}">
-     <StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource Icon}" Text="&#xE72C;" Margin="0,0,8,0"/><TextBlock Text="Analyze content"/></StackPanel>
+     <StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource Icon}" Text="&#xE72C;" Margin="0,0,8,0"/><TextBlock Text="{Binding AnalyzeLabel}"/></StackPanel>
     </Button>
    </StackPanel>
    <StackPanel Orientation="Horizontal">
@@ -28,7 +28,22 @@
   </DockPanel>
 
   <!-- Pipeline -->
-  <Border Grid.Row="1" Style="{StaticResource Card}" Padding="0" Margin="0,0,0,12">
+  <StackPanel Grid.Row="1">
+   <Border Style="{StaticResource Card}" Padding="20,16" Margin="0,0,0,12" Visibility="{Binding HasActivity, Converter={StaticResource Visible}}" AutomationProperties.Name="Duplicate analysis activity">
+    <StackPanel>
+     <DockPanel>
+      <Button DockPanel.Dock="Right" Command="{Binding Session.CancelCommand}" Content="Cancel analysis" Visibility="{Binding IsAnalyzing, Converter={StaticResource Visible}}" AutomationProperties.Name="Cancel duplicate analysis"/>
+      <TextBlock Text="{Binding AnalysisHeading}" Style="{StaticResource BodyStrongText}" FontSize="16"/>
+     </DockPanel>
+     <TextBlock Text="{Binding ActivityPhase}" Style="{StaticResource BodyText}" Margin="0,6,0,0" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
+     <ProgressBar Minimum="0" Maximum="100" Value="{Binding ActivityPercent, Mode=OneWay}" IsIndeterminate="{Binding IsIndeterminate}" Height="6" Margin="0,12" Visibility="{Binding IsAnalyzing, Converter={StaticResource Visible}}" AutomationProperties.Name="Progress within the current duplicate analysis stage"/>
+     <TextBlock Text="{Binding ActivityCounts}" Style="{StaticResource CaptionText}" Typography.NumeralAlignment="Tabular" TextWrapping="Wrap"/>
+     <TextBlock Text="{Binding ActivityFile}" Style="{StaticResource MonoText}" TextTrimming="CharacterEllipsis" ToolTip="{Binding ActivityFile}" Margin="0,4,0,0" Visibility="{Binding ActivityFile, Converter={StaticResource VisibleIfText}}"/>
+     <TextBlock Text="{Binding FileProgressText}" Style="{StaticResource CaptionText}" Visibility="{Binding FileProgressText, Converter={StaticResource VisibleIfText}}"/>
+     <WrapPanel Margin="0,6,0,0"><TextBlock Text="{Binding ActivityElapsed}" Style="{StaticResource CaptionText}" Margin="0,0,20,0"/><TextBlock Text="{Binding ActivityHeartbeat}" Style="{StaticResource CaptionText}" TextWrapping="Wrap"/></WrapPanel>
+    </StackPanel>
+   </Border>
+  <Border Style="{StaticResource Card}" Padding="0" Margin="0,0,0,12">
    <Grid>
     <TextBlock Text="No analysis yet. Analyze content compares sizes, then samples, then full hashes; only full-hash matches count as duplicates." Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="20,16" Visibility="{Binding NoRun, Converter={StaticResource Visible}}"/>
     <Grid Visibility="{Binding HasRun, Converter={StaticResource Visible}}">
@@ -47,6 +62,7 @@
     </Grid>
    </Grid>
   </Border>
+  </StackPanel>
 
   <Grid Grid.Row="2">
    <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="16"/><ColumnDefinition Width="320"/></Grid.ColumnDefinitions>

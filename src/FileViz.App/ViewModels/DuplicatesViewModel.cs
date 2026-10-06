@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Input;
@@ -83,6 +84,27 @@ public sealed class DuplicatesViewModel : Bindable, ISnapshotSection
     private readonly Dictionary<long, FileEntry> keepers = [];
     private readonly Dictionary<string, (long Group, FileEntry Entry)> removals = new(StringComparer.OrdinalIgnoreCase);
     private bool restoring;
+    private readonly System.Windows.Threading.DispatcherTimer activityClock = new() { Interval = TimeSpan.FromSeconds(1) };
+    private readonly Stopwatch elapsed = new();
+    private readonly Stopwatch heartbeat = new();
+    private long analysisGeneration;
+    private DuplicateProgress activity = new("Ready");
+    private bool analyzing;
+    public bool IsAnalyzing => analyzing;
+    private bool hasActivity;
+    public bool HasActivity => hasActivity;
+    private string analysisHeading = "Duplicate analysis";
+    public string AnalysisHeading => analysisHeading;
+    public string ActivityPhase => activity.Phase;
+    public string ActivityCounts => $"{(activity.Total is long total ? $"{activity.Completed:N0} / {total:N0} files" : "File total pending")} · {Format.Bytes(activity.BytesRead)} read · {activity.Cached:N0} cached · {activity.Errors:N0} errors";
+    public string ActivityFile => activity.CurrentFile?.Path ?? "";
+    public string FileProgressText => activity.CurrentFile is { TotalBytes: > 0 } file ? $"Current file: {Format.Bytes(file.BytesRead)} / {Format.Bytes(file.TotalBytes)}" : "";
+    public string ActivityElapsed => "Elapsed " + Format.Elapsed(elapsed.Elapsed);
+    public string ActivityHeartbeat => !IsAnalyzing ? "" : heartbeat.Elapsed.TotalSeconds < 5 ? "Receiving work updates" : $"Waiting for the next work update · last activity {Format.Elapsed(heartbeat.Elapsed)} ago";
+    public bool IsIndeterminate => activity.Total is not > 0;
+    public double ActivityPercent => activity.Total is > 0 ? Math.Clamp(100d * (activity.Completed +
+        (activity.CurrentFile is { TotalBytes: > 0 } file ? (double)file.BytesRead / file.TotalBytes : 0)) / activity.Total.Value, 0, 100) : 0;
+    public string AnalyzeLabel => IsAnalyzing ? "Analyzing…" : "Analyze content";
     public SessionViewModel Session => session;
     public CleanupViewModel Cleanup
     {
@@ -133,13 +155,13 @@ public sealed class DuplicatesViewModel : Bindable, ISnapshotSection
             }
         }
     }
-    public bool HasRun => Run != null;
-    public bool NoRun => Run == null;
+    public bool HasRun => Run != null && !IsAnalyzing;
+    public bool NoRun => Run == null && !HasActivity;
     public string VerifiedNote => Run == null ? "" : Run.Algorithm == "Name" ? Format.Count(Run.Groups, "name group") : $"files in {Format.Count(Run.Groups, "group")}";
     public string PageLabel => $"Groups page {page + 1}";
     public string SelectedBytes => Format.Bytes(removals.Values.Sum(x => x.Entry.Length));
     public string SelectedSummary => removals.Count == 0 ? "Select the copies to remove. Each group must keep one." : $"{Format.Count(removals.Count, "file")} in {Format.Count(removals.Values.Select(x => x.Group).Distinct().Count(), "group")} · every group keeps a copy";
-    public bool HasSelection => removals.Count > 0;
+    public bool HasSelection => removals.Count > 0 && !session.Busy;
     public string ReviewLabel => removals.Count == 0 ? "Review removals…" : $"Review {Format.Count(removals.Count, "removal")}…";
     public ICommand DuplicateCommand
     {
@@ -169,6 +191,7 @@ public sealed class DuplicatesViewModel : Bindable, ISnapshotSection
     {
         this.session = session;
         Cleanup = cleanup;
+        activityClock.Tick += (_, _) => { Changed(nameof(ActivityElapsed)); Changed(nameof(ActivityHeartbeat)); };
         DuplicateCommand = new ActionCommand(() => session.Run(FindDuplicatesAsync), () => session.HasSnapshot && !session.Busy);
         NameCommand = new ActionCommand(() => session.Run(() => FindDuplicatesAsync("Name")), () => session.HasSnapshot && !session.Busy);
         PreviousCommand = new ActionCommand(() => { page = Math.Max(0, page - 1); RefreshDuplicates(); }, () => page > 0 && !session.Busy);
@@ -183,13 +206,18 @@ public sealed class DuplicatesViewModel : Bindable, ISnapshotSection
             removals.Clear();
             RefreshDuplicates();
         }, () => removals.Count > 0);
-        session.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(SessionViewModel.CurrentRoot)) Changed(nameof(ScopeText)); };
+        session.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(SessionViewModel.CurrentRoot)) Changed(nameof(ScopeText));
+            if (e.PropertyName == nameof(SessionViewModel.Busy)) Changed(nameof(HasSelection));
+        };
     }
     public void Reset()
     {
         page = 0;
         keepers.Clear();
         removals.Clear();
+        if (!IsAnalyzing) { hasActivity = false; Changed(nameof(HasActivity)); Changed(nameof(NoRun)); }
         ChangedSelection();
     }
     public void HistoryChanged()
@@ -206,6 +234,7 @@ public sealed class DuplicatesViewModel : Bindable, ISnapshotSection
     public Task FindDuplicatesAsync() => FindDuplicatesAsync(Algorithm);
     public async Task FindDuplicatesAsync(string method)
     {
+        if (session.Busy || !session.HasSnapshot) return;
         var id = session.Active;
         var snapshots = new[] { id };
         var roots = session.CurrentRoot == null ? session.SnapshotRoots.ToArray() : new[] { session.CurrentRoot };
@@ -221,19 +250,64 @@ public sealed class DuplicatesViewModel : Bindable, ISnapshotSection
             roots = selected.Select(x => x.Root).Distinct().ToArray();
         }
         var token = session.BeginWork();
+        var generation = ++analysisGeneration;
+        analyzing = true;
+        hasActivity = true;
+        analysisHeading = method == "Name" ? "Finding name matches" : "Analyzing content · " + method;
+        activity = new("Preparing duplicate analysis");
+        elapsed.Restart();
+        heartbeat.Restart();
+        activityClock.Start();
+        ChangedActivity();
+        session.Status = analysisHeading + " · " + ActivityPhase;
         try
         {
             var database = session.DatabasePath;
             var preferred = PreferredFolder;
             var elevated = session.Administrator;
-            await Task.Run(() => DuplicateCoordinator.FindAsync(database, id, snapshots, roots, method, preferred, elevated, new Progress<string>(text => Application.Current.Dispatcher.Invoke(() => session.Status = text)), token));
+            var progress = new Progress<DuplicateProgress>(update =>
+            {
+                if (!IsAnalyzing || generation != analysisGeneration) return;
+                activity = update;
+                heartbeat.Restart();
+                ChangedActivity();
+                session.Status = analysisHeading + " · " + update.Phase;
+            });
+            await Task.Run(() => DuplicateCoordinator.FindAsync(database, id, snapshots, roots, method, preferred, elevated, progress, token));
             page = 0;
             keepers.Clear();
             removals.Clear();
             RefreshDuplicates();
             session.Status = method == "Name" ? "Name matches found. Names never establish duplicates; run content analysis before cleanup." : "Duplicate analysis complete. Cleanup performs fresh byte and stream verification.";
+            analysisHeading = method == "Name" ? "Name matching complete" : "Content analysis complete";
+            activity = activity with { Phase = Groups.Count == 0 ? "No matching groups found in this scope." : "Results ready for review.", CurrentFile = null };
         }
-        finally { session.EndWork(); }
+        catch (OperationCanceledException)
+        {
+            analysisHeading = "Duplicate analysis cancelled";
+            activity = activity with { Phase = "Analysis stopped. Previously completed results are retained.", CurrentFile = null };
+            session.Status = analysisHeading;
+        }
+        catch (Exception e) when (e is not OutOfMemoryException)
+        {
+            analysisHeading = "Duplicate analysis failed";
+            activity = activity with { Phase = e.Message, CurrentFile = null };
+            session.Status = analysisHeading + ": " + e.Message;
+        }
+        finally
+        {
+            elapsed.Stop();
+            activityClock.Stop();
+            analyzing = false;
+            session.EndWork();
+            ChangedActivity();
+        }
+    }
+    private void ChangedActivity()
+    {
+        foreach (var property in new[] { nameof(IsAnalyzing), nameof(HasActivity), nameof(AnalysisHeading), nameof(ActivityPhase),
+            nameof(ActivityCounts), nameof(ActivityFile), nameof(FileProgressText), nameof(ActivityElapsed), nameof(ActivityHeartbeat),
+            nameof(IsIndeterminate), nameof(ActivityPercent), nameof(AnalyzeLabel), nameof(HasRun), nameof(NoRun) }) Changed(property);
     }
     private void RefreshDuplicates()
     {

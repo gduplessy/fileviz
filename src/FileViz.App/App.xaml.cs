@@ -69,11 +69,11 @@ public partial class App : Application
                 window.Model.Home.Drives.Add(new FileViz.App.ViewModels.DriveRow(Path.GetFullPath(e.Args[1]), "Fixture · local sample data", "Disposable 40 MiB validation fixture", true));
                 // Mica is a DWM backdrop and does not appear in RenderTargetBitmap, so captures use the solid base color.
                 window.SetResourceReference(Control.BackgroundProperty, "SolidBackgroundFillColorBaseBrush");
-                async Task Capture(ThemeMode theme, string file, Window? target = null)
+                async Task Capture(ThemeMode theme, string file, Window? target = null, bool wait = true)
                 {
                     target ??= window;
                     SetTheme(theme);
-                    await Task.Delay(500);
+                    if (wait) await Task.Delay(500);
                     target.UpdateLayout();
                     var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap((int)((FrameworkElement)target.Content).ActualWidth, (int)((FrameworkElement)target.Content).ActualHeight, 96, 96, PixelFormats.Pbgra32);
                     bitmap.Render(target);
@@ -110,7 +110,31 @@ public partial class App : Application
                     if (window.Model.Session.Store.GetSummary(saved) != before || window.Model.Session.History.First(x => x.Value.Id == saved).Value.State != "Interrupted")
                         throw new InvalidOperationException("Rebuilding must preserve saved inventory and interrupted coverage without rescanning.");
                 }
-                await window.Model.Duplicates.FindDuplicatesAsync();
+                var duplicateActivity = Environment.GetEnvironmentVariable("FILEVIZ_SMOKE_DUPLICATE_ACTIVITY") == "1";
+                if (duplicateActivity)
+                {
+                    window.Model.SelectedNav = window.Model.NavItems[2];
+                    var analysis = window.Model.Duplicates.FindDuplicatesAsync();
+                    if (!window.Model.Duplicates.IsAnalyzing || !window.Model.Duplicates.HasActivity || window.Model.Duplicates.NoRun
+                        || !window.Model.Session.Status.StartsWith("Analyzing content", StringComparison.Ordinal))
+                        throw new InvalidOperationException("Duplicate activity must be visible immediately, before preparation finishes.");
+                    await Capture(ThemeMode.Light, "duplicate-active.png", wait: false);
+                    await analysis;
+                    await window.Model.Duplicates.FindDuplicatesAsync();
+                    if (!System.Text.RegularExpressions.Regex.IsMatch(window.Model.Duplicates.ActivityCounts, @"[1-9][0-9,]* cached"))
+                        throw new InvalidOperationException("Revalidated hash cache hits must appear in activity counters.");
+                    var previousRun = window.Model.Duplicates.Run;
+                    var cancelled = window.Model.Duplicates.FindDuplicatesAsync();
+                    window.Model.Session.CancelCommand.Execute(null);
+                    await cancelled;
+                    if (window.Model.Duplicates.IsAnalyzing || window.Model.Duplicates.AnalysisHeading != "Duplicate analysis cancelled"
+                        || window.Model.Duplicates.Run != previousRun || window.Model.Session.Busy)
+                        throw new InvalidOperationException("Cancelled duplicate analysis must leave the UI idle and retain previous results.");
+                    await Capture(ThemeMode.Dark, "duplicate-cancelled.png");
+                    await window.Model.Duplicates.FindDuplicatesAsync();
+                    await Capture(ThemeMode.Dark, "duplicate-complete.png");
+                }
+                else await window.Model.Duplicates.FindDuplicatesAsync();
                 if (!string.Equals(window.Model.Session.CurrentRoot, Path.GetFullPath(e.Args[1]), StringComparison.OrdinalIgnoreCase) || window.Model.Explorer.MapItems.Count == 0)
                     throw new InvalidOperationException("Snapshot root and populated treemap must remain selected after a scan.");
                 await Capture(ThemeMode.Light, "desktop.png");
@@ -163,6 +187,7 @@ public partial class App : Application
                     Snapshots = window.Model.Session.History.Count,
                     Errors = window.Model.Diagnostics.Errors.Count,
                     RebuiltSavedInventory = rebuilt,
+                    DuplicateActivityValidated = duplicateActivity,
                     RenderedVisibleWindow = true
                 }));
                 Shutdown(window.Model.Explorer.Files.Count > 0 && window.Model.Diagnostics.Errors.Count == 0 && window.Model.Duplicates.Duplicates.Count >= 2 ? 0 : 1);
