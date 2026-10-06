@@ -27,7 +27,9 @@ Logical and reported allocated sizes differ for sparse, compressed, resident, an
 
 ## Duplicates
 
-The default scope is the current root; **Compare across selected roots** spans drives and snapshots. **Analyze content** filters by size, compares samples, then hashes entire main streams. SHA-256 is the default; SHA-1 and MD5 are compatibility options. The pipeline card shows how many files passed each stage and the reclaimable size of verified groups only. **Find name matches** is fast, but name matches never imply savings and cannot be selected for removal. Known hard links are collapsed as aliases, not independent copies, and counted separately.
+Choose **Drive or folder** directly on the Duplicates page. The selector lists saved roots and scan IDs, opens the matching inventory, and keeps you on Duplicates. It follows Explorer and explicitly reopened historical scans; new choices normally use the latest saved scan for that root. Scan an additional drive in Home to add its inventory here. **Compare across selected drives** reveals checkboxes beside the selector and uses the latest saved scan for each checked root. Finish or cancel an active analysis before changing scope. Existing matches are the last completed analysis until you analyze the new selection.
+
+**Analyze content** filters by size, compares samples, then hashes entire main streams. SHA-256 is the default; SHA-1 and MD5 are compatibility options. The pipeline card shows how many files passed each stage and the reclaimable size of verified groups only. **Find name matches** is fast, but name matches never imply savings and cannot be selected for removal. Known hard links are collapsed as aliases, not independent copies, and counted separately.
 
 Each group card shows its evidence, size, and copies. Choose one copy to **Keep** and tick **Remove** on the others; a keeper can never be removed, and choices are kept as you page through groups. A preferred keeper folder influences suggested keepers on the next analysis; suggestions never select removals.
 

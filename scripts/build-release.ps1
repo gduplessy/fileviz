@@ -1,4 +1,4 @@
-param([string]$Version='0.2.4',[string]$OutputDirectory='artifacts\release',[string]$Iscc='')
+param([string]$Version='0.2.5',[string]$OutputDirectory='artifacts\release',[string]$Iscc='')
 $ErrorActionPreference='Stop'
 $fileVizRoot=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 Set-Location -LiteralPath $fileVizRoot

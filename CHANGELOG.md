@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.5 — preview
+
+- Add a drive/folder selector directly to Duplicates, showing saved scan IDs and coverage. Switching scopes selects the matching inventory without leaving the page.
+- Move cross-drive controls beside the selector; show the checked roots explicitly and use their latest saved inventories.
+- Keep historical snapshot selections synchronized and lock scope changes while analysis runs.
+- Verify scope switching, result isolation, cross-drive inclusion, busy lockout, and historical selection with rendered disposable fixtures.
+
 ## 0.2.4 — preview
 
 - Show duplicate-analysis activity immediately: database phases, stage counts, actual bytes read, current file, cache hits, errors, elapsed time, and the age of the last work update.

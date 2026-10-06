@@ -33,8 +33,8 @@
 ## Download
 
 <p>
-  <a href="https://github.com/gduplessy/fileviz/releases/download/v0.2.4/FileViz-0.2.4-win-x64-setup.exe"><img src="https://img.shields.io/badge/Download-Windows%20installer-1f6f8b?style=for-the-badge&amp;logo=github" alt="Download Windows installer"></a>
-  <a href="https://github.com/gduplessy/fileviz/releases/download/v0.2.4/FileViz-0.2.4-win-x64-portable.zip"><img src="https://img.shields.io/badge/Download-Portable%20ZIP-2b8a7a?style=for-the-badge&amp;logo=github" alt="Download portable ZIP"></a>
+  <a href="https://github.com/gduplessy/fileviz/releases/download/v0.2.5/FileViz-0.2.5-win-x64-setup.exe"><img src="https://img.shields.io/badge/Download-Windows%20installer-1f6f8b?style=for-the-badge&amp;logo=github" alt="Download Windows installer"></a>
+  <a href="https://github.com/gduplessy/fileviz/releases/download/v0.2.5/FileViz-0.2.5-win-x64-portable.zip"><img src="https://img.shields.io/badge/Download-Portable%20ZIP-2b8a7a?style=for-the-badge&amp;logo=github" alt="Download portable ZIP"></a>
 </p>
 
 | Package | Choose it when | How to run |
@@ -42,7 +42,7 @@
 | **Per-user installer** | You want Start menu integration and an uninstaller. | Run the setup executable. No administrator access is needed to install. |
 | **Portable ZIP** | You want to extract and run without installing. | Extract the **entire** archive, then launch `FileViz.exe`. Keep its `worker` folder beside it. |
 
-Both packages bundle the Windows x64 runtime; you do not need to install .NET. [All releases](https://github.com/gduplessy/fileviz/releases) · [v0.2.4 SHA-256 checksums](https://github.com/gduplessy/fileviz/releases/download/v0.2.4/SHA256SUMS.txt)
+Both packages bundle the Windows x64 runtime; you do not need to install .NET. [All releases](https://github.com/gduplessy/fileviz/releases) · [v0.2.5 SHA-256 checksums](https://github.com/gduplessy/fileviz/releases/download/v0.2.5/SHA256SUMS.txt)
 
 > [!NOTE]
 > Packages are currently unsigned. Windows SmartScreen may prompt before launch. Verify the checksum against the file attached to the same release.
