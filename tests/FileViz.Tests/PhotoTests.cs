@@ -88,6 +88,26 @@ public class PhotoTests
         Assert.Single(store.QueryPhotos(snapshot, first, new(Search: "000.png")));
     }
 
+    [Fact]
+    public async Task PhotoCleanupUsesManualReviewAndRejectsChangedInventory()
+    {
+        using var fixture = new Fixture();
+        var path = Path.Combine(fixture.Root, "small.png"); WritePng(path, 320, 200);
+        var entry = Native.ReadEntry(path);
+        var original = File.ReadAllBytes(path);
+        var service = new CleanupService(_ => { });
+        var check = await CleanupService.PrecheckAsync(new(entry));
+        Assert.True(check.Ready); Assert.Equal(CheckState.NotChecked, check.Bytes);
+        var quarantined = await service.QuarantineAsync(new(entry));
+        Assert.Equal("Quarantined", quarantined.State); Assert.False(File.Exists(path));
+        Assert.Equal(original, File.ReadAllBytes(quarantined.Destination));
+        Assert.Equal("Restored", service.Restore(quarantined).State); Assert.Equal(original, File.ReadAllBytes(path));
+        WritePng(path, 1200, 800);
+        Assert.False((await CleanupService.PrecheckAsync(new(entry))).Ready);
+        var rejected = await service.QuarantineAsync(new(entry));
+        Assert.Equal("Failed", rejected.State); Assert.True(File.Exists(path));
+    }
+
     // Valid PNG fixtures without image-library or package dependencies.
     private static void WritePng(string path, int width, int height)
     {

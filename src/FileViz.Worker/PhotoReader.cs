@@ -15,6 +15,7 @@ internal static class PhotoReader
         var scanned = request.Entry;
         try
         {
+            PhotoMemoryBudget.Ensure();
             if (!Path.IsPathFullyQualified(scanned.Path) || scanned.Path.StartsWith(@"\\.\", StringComparison.Ordinal) || !PhotoFormats.Extensions.Contains(scanned.Extension))
                 throw new InvalidDataException("Unsupported image path or extension.");
             if (scanned.IsDirectory || scanned.IsPlaceholder || scanned.IsReparse)
@@ -25,7 +26,8 @@ internal static class PhotoReader
                 var entry = Native.ReadEntry(parent);
                 if (entry.IsReparse || entry.IsPlaceholder) throw new IOException("Image has a reparse-point or placeholder parent.");
             }
-            using var handle = Native.CreateFileW(Native.LongPath(scanned.Path), 0x80000000, 1, IntPtr.Zero, 3, Native.OpenReparsePoint | Native.BackupSemantics, IntPtr.Zero);
+            // FILE_FLAG_OPEN_NO_RECALL prevents offline/provider data from being recalled by this read.
+            using var handle = Native.CreateFileW(Native.LongPath(scanned.Path), 0x80000000, 1, IntPtr.Zero, 3, Native.OpenReparsePoint | Native.BackupSemantics | 0x00100000, IntPtr.Zero);
             if (handle.IsInvalid) throw new Win32Exception(Marshal.GetLastWin32Error());
             var current = Native.ReadEntry(handle, scanned.Path);
             if (current.IsDirectory || current.IsReparse || current.IsPlaceholder) throw new IOException("Image is a directory, reparse point or cloud placeholder.");
