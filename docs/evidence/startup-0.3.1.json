@@ -1,0 +1,11 @@
+{
+  "Version": "0.3.1",
+  "RegressionTestsPassed": 68,
+  "DisposableWalAboveAutoCheckpointThreshold": true,
+  "SchemaUpgradePreservesPendingWal": true,
+  "InterruptedSnapshotRecoveredWithoutStartupCheckpoint": true,
+  "NormalWriteResumesAutomaticCheckpoint": true,
+  "PendingRowsPreserved": 11000,
+  "PreviousStartupBehaviorFailsRegression": true,
+  "ValidatedUtc": "2026-10-06T13:17:50.4004232Z"
+}

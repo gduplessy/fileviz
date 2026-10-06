@@ -1,8 +1,10 @@
-# FileViz 0.3.0 preview
+# FileViz 0.3.1 preview
 
-Review low-resolution photos by drive and move explicitly selected originals to reversible quarantine.
+Fix upgrade startup when a saved inventory has a large pending SQLite WAL. Includes the Photos review tools introduced in 0.3.0.
 
 ## Changes
+
+- Defer automatic checkpoints until startup schema changes finish, so a schema upgrade does not copy the entire pending WAL before showing the window. Normal checkpoint thresholds resume afterwards; pending pages and saved results are preserved.
 
 - New **Photos** page (Ctrl+7) with a saved drive/folder selector, name/path filtering, and 100-row pages.
 - Short-edge threshold defaults to 720 pixels. Enable a megapixel threshold as well, or use zero to disable either criterion. Portrait and landscape receive the same treatment. Resolution does not measure blur or compression quality.
@@ -13,7 +15,7 @@ Review low-resolution photos by drive and move explicitly selected originals to 
 
 ## Packages and validation
 
-Use `FileViz-0.3.0-win-x64-setup.exe` or extract the complete `FileViz-0.3.0-win-x64-portable.zip`. Verify the attached `SHA256SUMS.txt`.
+Use `FileViz-0.3.1-win-x64-setup.exe` or extract the complete `FileViz-0.3.1-win-x64-portable.zip`. Verify the attached `SHA256SUMS.txt`.
 
 Regression coverage includes threshold boundaries and orientation, bounded worker previews, changed-file/cache rejection, root isolation, pagination, and original-byte preservation through disposable photo quarantine/restore. The rendered fixture exercises analysis, preview, explicit review, cancellation with retained results, error separation, and restore.
 

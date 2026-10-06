@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.1 — preview
+
+- Defer automatic SQLite checkpoints until startup schema changes finish. Upgrading a saved inventory with a large pending WAL can open the window without copying all pending pages first; normal checkpoint thresholds resume afterwards.
+- Verify pending WAL preservation, schema creation, and saved snapshots with a disposable database regression.
+
 ## 0.3.0 — preview
 
 - Add Photos with a saved drive/folder selector, orientation-independent short-edge and megapixel thresholds, name/path filters, 100-row pages, and unreadable-image diagnostics.
