@@ -1,0 +1,47 @@
+{
+  "Version": "0.3.2",
+  "SourceVersion": "0.3.2+22d2c646d177fa6ee2336f33fbfdb5c67361ab37",
+  "ChecksumsVerified": true,
+  "DeveloperRuntimeRemovedFromEnvironment": true,
+  "InstallerTested": false,
+  "NativeSmallWindowIconValidated": true,
+  "NativeLargeWindowIconValidated": true,
+  "ExecutableIconValidated": true,
+  "IconBrandColors": [
+    "#0F6A87",
+    "#23877B",
+    "#D68B2A"
+  ],
+  "IconFrameSizes": [
+    16,
+    20,
+    24,
+    32,
+    40,
+    48,
+    64,
+    128,
+    256
+  ],
+  "IconGenerationReproducible": true,
+  "Portable": {
+    "Status": "Duplicate analysis complete. Cleanup performs fresh byte and stream verification.",
+    "SummaryText": "304 files · 39.63 MiB logical · 39.38 MiB reported allocation",
+    "Rows": 250,
+    "DuplicateRows": 2,
+    "PeakWorkingSet": 216895488,
+    "Snapshots": 4,
+    "Errors": 0,
+    "RebuiltSavedInventory": true,
+    "DuplicateActivityValidated": true,
+    "DuplicateScopeValidated": true,
+    "PhotosValidated": true,
+    "RenderedVisibleWindow": true
+  },
+  "InitialSmokeTimeoutSeconds": 60,
+  "SmokeCompletedAfterInitialTimeout": true,
+  "SmokeExitCode": null,
+  "RegressionTestsPassed": 68,
+  "ReleaseWorkflow": "https://github.com/gduplessy/fileviz/actions/runs/37473111525",
+  "ValidatedUtc": "2026-10-06T14:03:14.8770263Z"
+}
