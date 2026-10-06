@@ -3,7 +3,7 @@
   "SourceVersion": "0.3.0+aacbd9720c52e2eea9e30be975bec1a486103175",
   "ChecksumsVerified": true,
   "DeveloperRuntimeRemovedFromEnvironment": true,
-  "InstallerTested": false,
+  "InstallerTested": true,
   "Portable": {
     "Status": "Duplicate analysis complete. Cleanup performs fresh byte and stream verification.",
     "SummaryText": "304 files · 39.63 MiB logical · 39.38 MiB reported allocation",
@@ -21,5 +21,9 @@
   "SmokeExitCode": 0,
   "ValidatedUtc": "2026-10-06T09:39:00.1490746Z",
   "RegressionTestsPassed": 67,
-  "ReleaseWorkflow": "https://github.com/gduplessy/fileviz/actions/runs/37443883386"
+  "ReleaseWorkflow": "https://github.com/gduplessy/fileviz/actions/runs/37443883386",
+  "InstalledVersion": "0.3.0+aacbd9720c52e2eea9e30be975bec1a486103175",
+  "InstallerExitCode": 0,
+  "UninstallerTested": false,
+  "InstallerValidatedUtc": "2026-10-06T12:56:43.2803055Z"
 }
