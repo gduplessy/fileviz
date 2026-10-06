@@ -48,7 +48,9 @@ try
                 foreach (var hash in hashes)
                 {
                     Hashing.Algorithm(hash.Algorithm);
-                    await Wire.WriteAsync(pipe, new WorkerMessage("hash", Hash: await Hashing.HashAsync(hash)));
+                    var result = await Hashing.HashAsync(hash, progress: update =>
+                        Wire.WriteAsync(pipe, new WorkerMessage("hash-progress", HashProgress: update)));
+                    await Wire.WriteAsync(pipe, new WorkerMessage("hash", Hash: result));
                 }
             }
             else if (request.Operation == "metadata" && request.MetadataPaths is { Length: > 0 and <= 64 } paths)

@@ -13,7 +13,7 @@ public static class Hashing
         "MD5" => HashAlgorithmName.MD5,
         _ => throw new ArgumentException("Supported algorithms: SHA-256, SHA-1, MD5.", nameof(name))
     };
-    public static async Task<HashResult> HashAsync(HashRequest request, CancellationToken token = default)
+    public static async Task<HashResult> HashAsync(HashRequest request, CancellationToken token = default, Func<HashProgress, Task>? progress = null)
     {
         try
         {
@@ -30,6 +30,18 @@ public static class Hashing
                 throw new IOException("File changed while opening.");
             using var stream = new FileStream(handle, FileAccess.Read, 1024 * 1024, false);
             using var hash = IncrementalHash.CreateHash(Algorithm(request.Algorithm));
+            var total = request.Sample && opened.Length > 3 * 65536 ? 3 * 65536 : opened.Length;
+            long read = 0;
+            var updates = System.Diagnostics.Stopwatch.StartNew();
+            async Task Report(bool force = false)
+            {
+                if (progress != null && (force || updates.ElapsedMilliseconds >= 250))
+                {
+                    await progress(new(entry.Path, read, total));
+                    updates.Restart();
+                }
+            }
+            await Report(true);
             var buffer = ArrayPool<byte>.Shared.Rent(1024 * 1024);
             try
             {
@@ -42,14 +54,21 @@ public static class Hashing
                         stream.Position = offset;
                         await stream.ReadExactlyAsync(buffer.AsMemory(0, 65536), token);
                         hash.AppendData(buffer, 0, 65536);
+                        read += 65536;
+                        await Report();
                     }
                 }
                 else
                 {
                     int count;
                     while ((count = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), token)) > 0)
+                    {
                         hash.AppendData(buffer, 0, count);
+                        read += count;
+                        await Report();
+                    }
                 }
+                await Report(true);
                 var after = Native.ReadEntry(handle, entry.Path);
                 if (after.Identity != opened.Identity || after.Length != opened.Length || after.ModifiedTicks != opened.ModifiedTicks || after.ChangeTicks != opened.ChangeTicks)
                     throw new IOException("File changed while hashing.");

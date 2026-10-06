@@ -379,10 +379,12 @@ public sealed partial class IndexStore : IDisposable
     public void AddDuplicate(long snapshot, long group, string path, string evidence, bool keeper) => Execute("INSERT OR REPLACE INTO duplicates VALUES($s,$g,$p,$e,$k,(SELECT MAX(snapshot) FROM entries WHERE path=$p));", ("$s", snapshot), ("$g", group), ("$p", path), ("$e", evidence), ("$k", keeper ? 1 : 0));
     public void FindNameDuplicates(long destination, long[] snapshots, string[]? roots = null)
     {
-        ClearDuplicates(destination);
         var ids = string.Join(',', snapshots);
         if (ids.Length == 0)
             return;
+        ReportDuplicatePhase("Grouping case-insensitive name matches");
+        using var transaction = connection.BeginTransaction();
+        ClearDuplicates(destination);
         var rootSql = roots is { Length: > 0 } ? " AND root IN(" + string.Join(',', roots.Select((_, i) => "$root" + i)) + ")" : "";
         var parameters = new List<(string Name, object? Value)> { ("$s", destination) };
         if (roots != null)
@@ -398,6 +400,7 @@ public sealed partial class IndexStore : IDisposable
         var names = Convert.ToInt64(Scalar("SELECT COUNT(*) FROM duplicates WHERE snapshot=$s;", ("$s", destination)));
         var groups = Convert.ToInt64(Scalar("SELECT COUNT(DISTINCT groupid) FROM duplicates WHERE snapshot=$s;", ("$s", destination)));
         SaveDuplicateRun(destination, new("Name", 0, 0, 0, groups, 0, names, 0, DateTime.UtcNow.ToString("O")));
+        transaction.Commit();
     }
     public List<DuplicateRow> Duplicates(long snapshot, int page = 0)
     {

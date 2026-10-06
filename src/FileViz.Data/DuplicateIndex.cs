@@ -4,9 +4,44 @@ namespace FileViz.Data;
 public sealed partial class IndexStore
 {
     private long collapsedAliases;
+    private string duplicatePhase = "Preparing duplicate analysis";
+    private Action<string>? duplicateProgress;
+    /// <summary>Reports actual SQLite execution activity and interrupts database work on cancellation.</summary>
+    public IDisposable ObserveDuplicateWork(Action<string> progress, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        duplicateProgress = progress;
+        commandCancellation = token;
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        SQLitePCL.raw.sqlite3_progress_handler(connection.Handle!, 100000, _ =>
+        {
+            if (token.IsCancellationRequested) return 1;
+            if (clock.ElapsedMilliseconds >= 1000)
+            {
+                progress(duplicatePhase);
+                clock.Restart();
+            }
+            return 0;
+        }, null);
+        var registration = token.Register(() => SQLitePCL.raw.sqlite3_interrupt(connection.Handle!));
+        return new DuplicateObservation(() =>
+        {
+            registration.Dispose();
+            SQLitePCL.raw.sqlite3_progress_handler(connection.Handle!, 0, null, null);
+            duplicateProgress = null;
+            commandCancellation = default;
+        });
+    }
+    private sealed class DuplicateObservation(Action dispose) : IDisposable { public void Dispose() => dispose(); }
+    private void ReportDuplicatePhase(string phase)
+    {
+        duplicatePhase = phase;
+        duplicateProgress?.Invoke(phase);
+    }
     public void PrepareContentWork(long[] snapshots, string[]? roots = null)
     {
         collapsedAliases = 0;
+        ReportDuplicatePhase("Preparing candidate tables");
         Execute("""
         CREATE TABLE IF NOT EXISTS duplicate_work(path TEXT PRIMARY KEY,parent TEXT NOT NULL,name TEXT NOT NULL,identity TEXT,isdir INTEGER NOT NULL,length INTEGER NOT NULL,allocated INTEGER,modified INTEGER NOT NULL,changed INTEGER NOT NULL,attrs INTEGER NOT NULL,source INTEGER NOT NULL,sample TEXT,hash TEXT);
         CREATE INDEX IF NOT EXISTS work_sample ON duplicate_work(length,sample);
@@ -18,24 +53,40 @@ public sealed partial class IndexStore
             return;
         var rootSql = roots is { Length: > 0 } ? " AND root IN(" + string.Join(',', roots.Select((_, i) => "$root" + i)) + ")" : "";
         var parameters = roots?.Select((value, i) => ("$root" + i, (object?)value)).ToArray() ?? [];
+        ReportDuplicatePhase("Selecting files and collapsing hard-link aliases");
+        // A single snapshot already has one row per path; no latest-history lookup is needed.
+        var latest = snapshots.Length == 1 ? "" : $" AND e.snapshot=(SELECT MAX(s.snapshot) FROM entries s WHERE s.path=e.path AND s.snapshot IN({ids}) {rootSql})";
         Execute($"""
         INSERT INTO duplicate_work(path,parent,name,identity,isdir,length,allocated,modified,changed,attrs,source)
         SELECT e.path,e.parent,e.name,e.identity,e.isdir,e.length,e.allocated,e.modified,e.changed,e.attrs,e.snapshot FROM entries e
-        WHERE e.snapshot IN({ids}) AND e.isdir=0 AND e.length>0 {rootSql} AND e.snapshot=(SELECT MAX(s.snapshot) FROM entries s WHERE s.path=e.path AND s.snapshot IN({ids}) {rootSql})
+        WHERE e.snapshot IN({ids}) AND e.isdir=0 AND e.length>0 {rootSql} {latest}
         GROUP BY COALESCE(e.identity,e.path);
         """, parameters);
         // Paths in scope minus physical files staged: hard-link aliases collapsed to one identity.
-        var paths = Convert.ToInt64(Scalar($"SELECT COUNT(*) FROM entries e WHERE e.snapshot IN({ids}) AND e.isdir=0 AND e.length>0 {rootSql} AND e.snapshot=(SELECT MAX(s.snapshot) FROM entries s WHERE s.path=e.path AND s.snapshot IN({ids}) {rootSql});", parameters));
+        ReportDuplicatePhase("Counting candidate files and aliases");
+        var paths = Convert.ToInt64(Scalar($"SELECT COUNT(*) FROM entries e WHERE e.snapshot IN({ids}) AND e.isdir=0 AND e.length>0 {rootSql} {latest};", parameters));
         collapsedAliases = Math.Max(0, paths - Convert.ToInt64(Scalar("SELECT COUNT(*) FROM duplicate_work;")));
+    }
+    private static string CandidateCondition(bool fullHash) => fullHash
+        ? "e.sample IS NOT NULL AND (e.length,e.sample) IN(SELECT length,sample FROM duplicate_work WHERE sample IS NOT NULL GROUP BY length,sample HAVING COUNT(*)>1)"
+        : "e.length IN(SELECT length FROM duplicate_work GROUP BY length HAVING COUNT(*)>1)";
+    public long WorkCandidateCount(bool fullHash)
+    {
+        ReportDuplicatePhase(fullHash ? "Selecting sample matches" : "Selecting same-size candidates");
+        return Convert.ToInt64(Scalar($"SELECT COUNT(*) FROM duplicate_work e WHERE {CandidateCondition(fullHash)};"));
     }
     public IEnumerable<FileEntry> WorkCandidates(bool fullHash)
     {
+        ReportDuplicatePhase(fullHash ? "Loading full-hash candidates" : "Loading sample candidates");
         using var command = Command($"""
-        SELECT {EntryColumns} FROM duplicate_work e WHERE {(fullHash ? "e.sample IS NOT NULL AND (e.length,e.sample) IN(SELECT length,sample FROM duplicate_work WHERE sample IS NOT NULL GROUP BY length,sample HAVING COUNT(*)>1)" : "e.length IN(SELECT length FROM duplicate_work GROUP BY length HAVING COUNT(*)>1)")} ORDER BY e.length,e.path;
+        SELECT {EntryColumns} FROM duplicate_work e WHERE {CandidateCondition(fullHash)} ORDER BY e.length,e.path;
         """);
         using var reader = command.ExecuteReader();
         while (reader.Read())
+        {
+            commandCancellation.ThrowIfCancellationRequested();
             yield return Entry(reader);
+        }
     }
     public void SaveWorkHash(HashResult result, bool fullHash)
     {
@@ -43,6 +94,8 @@ public sealed partial class IndexStore
     }
     public void FinishContentWork(long destination, string algorithm, string preferredFolder)
     {
+        ReportDuplicatePhase("Grouping verified hashes");
+        using var transaction = connection.BeginTransaction();
         ClearDuplicates(destination);
         var prefix = preferredFolder.Length == 0 ? "" : EscapeLike(Paths.Normalize(preferredFolder) + System.IO.Path.DirectorySeparatorChar) + "%";
         Execute("""
@@ -52,6 +105,7 @@ public sealed partial class IndexStore
         FROM duplicate_work WHERE hash IS NOT NULL AND (length,hash) IN(SELECT length,hash FROM duplicate_work WHERE hash IS NOT NULL GROUP BY length,hash HAVING COUNT(*)>1);
         """, ("$s", destination), ("$e", algorithm + " content"), ("$pref", prefix));
         long Count(string sql) => Convert.ToInt64(Scalar(sql, ("$s", destination)));
+        ReportDuplicatePhase("Saving duplicate results and summary");
         SaveDuplicateRun(destination, new(algorithm,
             Count("SELECT COUNT(*) FROM duplicate_work WHERE length IN(SELECT length FROM duplicate_work GROUP BY length HAVING COUNT(*)>1);"),
             Count("SELECT COUNT(*) FROM duplicate_work WHERE sample IS NOT NULL AND (length,sample) IN(SELECT length,sample FROM duplicate_work WHERE sample IS NOT NULL GROUP BY length,sample HAVING COUNT(*)>1);"),
@@ -60,6 +114,7 @@ public sealed partial class IndexStore
             DuplicatePotential(destination),
             Count("SELECT COUNT(*) FROM duplicate_work WHERE LOWER(name) IN(SELECT LOWER(name) FROM duplicate_work GROUP BY LOWER(name) HAVING COUNT(*)>1);"),
             collapsedAliases, DateTime.UtcNow.ToString("O")));
+        transaction.Commit();
     }
     private void SaveDuplicateRun(long snapshot, DuplicateRun run) => Execute("INSERT OR REPLACE INTO duplicate_runs VALUES($s,$a,$c,$m,$v,$g,$r,$n,$h,$f);",
         ("$s", snapshot), ("$a", run.Algorithm), ("$c", run.SizeCandidates), ("$m", run.SampleMatches), ("$v", run.VerifiedFiles), ("$g", run.Groups), ("$r", run.Reclaimable), ("$n", run.NameMatches), ("$h", run.Aliases), ("$f", run.Finished));

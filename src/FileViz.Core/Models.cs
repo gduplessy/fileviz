@@ -29,8 +29,12 @@ public record DuplicateRow(long GroupId, FileEntry Entry, string Evidence, bool 
 public record DuplicateRun(string Algorithm, long SizeCandidates, long SampleMatches, long VerifiedFiles, long Groups, long Reclaimable, long NameMatches, long Aliases, string Finished);
 public record HashRequest(FileEntry Entry, string Algorithm, bool Sample = false);
 public record HashResult(string Path, string? Hash, string? Identity, long Length, long ModifiedTicks, long ChangeTicks, string? Error);
+/// <summary>Actual bytes read from one file; sampling totals reflect sampled blocks, not logical size.</summary>
+public record HashProgress(string Path, long BytesRead, long TotalBytes);
+public record DuplicateProgress(string Phase, long Completed = 0, long? Total = null, long BytesRead = 0,
+    long Cached = 0, long Errors = 0, HashProgress? CurrentFile = null);
 public record WorkerRequest(string Operation, ScanScope[]? Scopes = null, HashRequest[]? Hashes = null, string[]? MetadataPaths = null);
-public record WorkerMessage(string Kind, ScanBatch? Batch = null, HashResult? Hash = null, string? Text = null, FileEntry? Entry = null, string? Path = null);
+public record WorkerMessage(string Kind, ScanBatch? Batch = null, HashResult? Hash = null, string? Text = null, FileEntry? Entry = null, string? Path = null, HashProgress? HashProgress = null);
 public record QueryFilter(string Search = "", string Extension = "", long MinimumSize = 0, long? ModifiedAfter = null, uint RequiredAttributes = 0, string? Parent = null, bool Allocated = false, string? Root = null);
 public record Difference(string Path, string Change, long Before, long After)
 {
