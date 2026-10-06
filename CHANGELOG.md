@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.2 — preview
+
+- Use the FileViz brand mark for the Windows executable, running taskbar icon, and title bar. Include nine transparent icon sizes from 16 to 256 pixels and retain SVG source with a reproducible Windows generator.
+
 ## 0.3.1 — preview
 
 - Defer automatic SQLite checkpoints until startup schema changes finish. Upgrading a saved inventory with a large pending WAL can open the window without copying all pending pages first; normal checkpoint thresholds resume afterwards.
