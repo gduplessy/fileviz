@@ -1,19 +1,20 @@
-# FileViz 0.2.5 preview
+# FileViz 0.3.0 preview
 
-Select the drive for duplicate analysis directly on the Duplicates page.
+Review low-resolution photos by drive and move explicitly selected originals to reversible quarantine.
 
 ## Changes
 
-- A Drive or folder selector lists saved roots with their scan IDs. Choosing a root selects its matching snapshot and keeps the Duplicates page open.
-- Coverage and inventory requirements are explicit: scan an additional drive in Home before analyzing its saved inventory.
-- Cross-drive comparison and drive checkboxes now sit beside the selector, rather than in the removal tray. Cross-drive mode uses the latest saved scan for each checked root.
-- The selector reflects Explorer and scan-history changes, including explicitly reopened older snapshots. Selecting a single scope replaces the cross-drive defaults with that scope.
-- Scope changes are locked during analysis; finish or cancel before choosing another drive. Existing matches are labelled as the last completed analysis until a new run replaces them.
+- New **Photos** page (Ctrl+7) with a saved drive/folder selector, name/path filtering, and 100-row pages.
+- Short-edge threshold defaults to 720 pixels. Enable a megapixel threshold as well, or use zero to disable either criterion. Portrait and landscape receive the same treatment. Resolution does not measure blur or compression quality.
+- Read dimensions on demand in a dedicated worker with progress, elapsed time, current file, cancellation, and retained metadata. Normal drive scanning remains metadata-only.
+- Windows codecs support common raster formats; optional WebP/HEIC/AVIF support depends on installed codecs. Unsupported, corrupt, inaccessible, changing, or timed-out images appear separately and cannot be selected for removal.
+- Inspect a bounded preview or show the original in Explorer. Select individual photos or the visible page, review, and quarantine only files that pass fresh identity/timestamp checks. Restore originals from Cleanup without overwriting.
+- Codec workers have a Windows-enforced 384 MiB committed-memory limit and ten-second read deadlines. Cloud placeholders and reparse paths are skipped. No automatic removal selections, hydration requests, or permanent-deletion fallback.
 
 ## Packages and validation
 
-Use the per-user `FileViz-0.2.5-win-x64-setup.exe` or extract the complete `FileViz-0.2.5-win-x64-portable.zip`. Verify the attached `SHA256SUMS.txt`.
+Use `FileViz-0.3.0-win-x64-setup.exe` or extract the complete `FileViz-0.3.0-win-x64-portable.zip`. Verify the attached `SHA256SUMS.txt`.
 
-The visible disposable UI fixture verifies switching between two inventories without leaving Duplicates, single-scope result isolation, cross-drive results from both scopes, busy lockout, return to a single scope, and historical snapshot selection. Duplicate progress, cancellation, and cache reuse checks remain enabled. The regression suite contains 63 tests.
+Regression coverage includes threshold boundaries and orientation, bounded worker previews, changed-file/cache rejection, root isolation, pagination, and original-byte preservation through disposable photo quarantine/restore. The rendered fixture exercises analysis, preview, explicit review, cancellation with retained results, error separation, and restore.
 
-Close the previous process before upgrading. Saved inventories and completed duplicate results are preserved; a running analysis must be cancelled or restarted to apply the new UI. Preview quality; no telemetry, automatic updates, or automatic deletion.
+Close the previous process before upgrading. Saved inventories, duplicate results, and journals are preserved. Preview quality; no telemetry, automatic updates, or automatic deletion.

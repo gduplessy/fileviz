@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0 — preview
+
+- Add Photos with a saved drive/folder selector, orientation-independent short-edge and megapixel thresholds, name/path filters, 100-row pages, and unreadable-image diagnostics.
+- Analyze image headers on demand using authenticated read-only workers; keep disk scans metadata-only. Revalidate cached identity/change metadata, retain completed batches on cancellation, and display counts, current path, elapsed time, and heartbeat.
+- Bound codec workers with a 384 MiB Windows job limit and ten-second read deadlines. Skip reparse paths and placeholders without recall; optional formats depend on installed codecs.
+- Load bounded first-frame previews and provide Explorer inspection. Explicit file/page selections use existing reviewed quarantine/restore with fresh identity/timestamp checks. No automatic removal selections.
+
 ## 0.2.5 — preview
 
 - Add a drive/folder selector directly to Duplicates, showing saved scan IDs and coverage. Switching scopes selects the matching inventory without leaving the page.
