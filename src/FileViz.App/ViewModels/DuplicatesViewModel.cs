@@ -111,6 +111,35 @@ public sealed class DuplicatesViewModel : Bindable, ISnapshotSection
         get;
     }
     public ObservableCollection<DuplicateScopeRow> DuplicateRoots { get; } = [];
+    public ObservableCollection<DuplicateScopeRow> AvailableScopes { get; } = [];
+    private bool synchronizingScope;
+    private DuplicateScopeRow? selectedScope;
+    /// <summary>Choose a saved drive/folder directly without navigating away from Duplicates.</summary>
+    public DuplicateScopeRow? SelectedScope
+    {
+        get => selectedScope;
+        set
+        {
+            if (synchronizingScope || value == null) return;
+            if (session.Busy) { Changed(nameof(SelectedScope)); return; }
+            var snapshot = session.History.FirstOrDefault(x => x.Value.Id == value.Snapshot);
+            if (snapshot == null || !Set(ref selectedScope, value)) return;
+            synchronizingScope = true;
+            try
+            {
+                if (session.Active != value.Snapshot) session.SelectedSnapshot = snapshot;
+                session.CurrentRoot = value.Root;
+                foreach (var scope in DuplicateRoots) scope.Selected = scope.Root.Equals(value.Root, StringComparison.OrdinalIgnoreCase);
+            }
+            finally { synchronizingScope = false; }
+            SynchronizeScope();
+        }
+    }
+    public string ScopeDescription => session.Busy ? "Finish or cancel the current operation before changing drives."
+        : CrossDrive ? "Uses the latest saved scan for each selected drive or folder. Scan another drive in Home to add it here."
+        : SelectedScope is { } scope
+        ? $"Saved scan #{scope.Snapshot} · {scope.State}. Scan another drive in Home to add it here."
+        : "Scan a drive or folder in Home to make it available here.";
     public ObservableCollection<DuplicateRow> Duplicates { get; } = [];
     public ObservableCollection<DuplicateGroup> Groups { get; } = [];
     private string algorithm = "SHA-256"; public string Algorithm
@@ -137,12 +166,20 @@ public sealed class DuplicatesViewModel : Bindable, ISnapshotSection
     {
         get => Algorithm == "MD5"; set { if (value) Algorithm = "MD5"; }
     }
-    public bool CrossDrive { get; set; } = false;
+    private bool crossDrive;
+    public bool CrossDrive
+    {
+        get => crossDrive; set
+        {
+            if (session.Busy) { Changed(nameof(CrossDrive)); return; }
+            if (Set(ref crossDrive, value)) { Changed(nameof(ScopeText)); Changed(nameof(ScopeDescription)); CommandManager.InvalidateRequerySuggested(); }
+        }
+    }
     private string preferredFolder = ""; public string PreferredFolder
     {
         get => preferredFolder; set => Set(ref preferredFolder, value);
     }
-    public string ScopeText => CrossDrive ? "Selected roots" : session.CurrentRoot ?? "No root";
+    public string ScopeText => CrossDrive ? string.Join(", ", DuplicateRoots.Where(x => x.Selected).Select(x => x.Root)) : SelectedScope?.Root ?? "Choose a drive";
     private DuplicateRun? run; public DuplicateRun? Run
     {
         get => run; private set
@@ -192,8 +229,8 @@ public sealed class DuplicatesViewModel : Bindable, ISnapshotSection
         this.session = session;
         Cleanup = cleanup;
         activityClock.Tick += (_, _) => { Changed(nameof(ActivityElapsed)); Changed(nameof(ActivityHeartbeat)); };
-        DuplicateCommand = new ActionCommand(() => session.Run(FindDuplicatesAsync), () => session.HasSnapshot && !session.Busy);
-        NameCommand = new ActionCommand(() => session.Run(() => FindDuplicatesAsync("Name")), () => session.HasSnapshot && !session.Busy);
+        DuplicateCommand = new ActionCommand(() => session.Run(FindDuplicatesAsync), CanAnalyze);
+        NameCommand = new ActionCommand(() => session.Run(() => FindDuplicatesAsync("Name")), CanAnalyze);
         PreviousCommand = new ActionCommand(() => { page = Math.Max(0, page - 1); RefreshDuplicates(); }, () => page > 0 && !session.Busy);
         NextCommand = new ActionCommand(() => { page++; RefreshDuplicates(); }, () => Duplicates.Count == 250 && !session.Busy);
         SelectAllCommand = new ActionCommand(() =>
@@ -208,8 +245,8 @@ public sealed class DuplicatesViewModel : Bindable, ISnapshotSection
         }, () => removals.Count > 0);
         session.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName == nameof(SessionViewModel.CurrentRoot)) Changed(nameof(ScopeText));
-            if (e.PropertyName == nameof(SessionViewModel.Busy)) Changed(nameof(HasSelection));
+            if (e.PropertyName == nameof(SessionViewModel.CurrentRoot)) SynchronizeScope();
+            if (e.PropertyName == nameof(SessionViewModel.Busy)) { Changed(nameof(HasSelection)); Changed(nameof(ScopeDescription)); }
         };
     }
     public void Reset()
@@ -222,9 +259,42 @@ public sealed class DuplicatesViewModel : Bindable, ISnapshotSection
     }
     public void HistoryChanged()
     {
-        var choices = session.History.SelectMany(x => (JsonSerializer.Deserialize<string[]>(x.Value.Roots) ?? []).Select(root => new { x.Value.Id, Root = root })).GroupBy(x => x.Root, StringComparer.OrdinalIgnoreCase).Select(x => x.OrderByDescending(y => y.Id).First()).ToArray();
+        var choices = session.History.SelectMany(x => (JsonSerializer.Deserialize<string[]>(x.Value.Roots) ?? []).Select(root => new { x.Value.Id, x.Value.State, Root = root })).GroupBy(x => x.Root, StringComparer.OrdinalIgnoreCase).Select(x => x.OrderByDescending(y => y.Id).First()).OrderBy(x => x.Root, StringComparer.OrdinalIgnoreCase).ToArray();
         var selectedRoots = DuplicateRoots.Where(x => x.Selected).Select(x => x.Root).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        SessionViewModel.Replace(DuplicateRoots, choices.Select(x => new DuplicateScopeRow(x.Id, x.Root, selectedRoots.Contains(x.Root) || x.Root == session.CurrentRoot)));
+        synchronizingScope = true;
+        try
+        {
+            SessionViewModel.Replace(DuplicateRoots, choices.Select(x => new DuplicateScopeRow(x.Id, x.Root, selectedRoots.Contains(x.Root) || x.Root == session.CurrentRoot, x.State)));
+            foreach (var scope in DuplicateRoots)
+                scope.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(DuplicateScopeRow.Selected)) { Changed(nameof(ScopeText)); CommandManager.InvalidateRequerySuggested(); } };
+            SessionViewModel.Replace(AvailableScopes, DuplicateRoots);
+        }
+        finally { synchronizingScope = false; }
+        SynchronizeScope();
+    }
+    private bool CanAnalyze() => session.HasSnapshot && !session.Busy && (CrossDrive ? DuplicateRoots.Any(x => x.Selected) : SelectedScope != null);
+    private void SynchronizeScope()
+    {
+        if (synchronizingScope) return;
+        synchronizingScope = true;
+        try
+        {
+            var scope = AvailableScopes.FirstOrDefault(x => x.Snapshot == session.Active && x.Root.Equals(session.CurrentRoot, StringComparison.OrdinalIgnoreCase));
+            // Keep an explicitly reopened historical snapshot selectable alongside the latest scans.
+            if (scope == null && session.CurrentRoot is { } root && session.SelectedSnapshot is { } snapshot)
+            {
+                scope = new(session.Active, root, false, snapshot.Value.State);
+                AvailableScopes.Add(scope);
+            }
+            selectedScope = scope;
+            if (!DuplicateRoots.Any(x => x.Selected))
+                foreach (var row in DuplicateRoots) row.Selected = row.Root.Equals(session.CurrentRoot, StringComparison.OrdinalIgnoreCase);
+            Changed(nameof(SelectedScope));
+            Changed(nameof(ScopeText));
+            Changed(nameof(ScopeDescription));
+            CommandManager.InvalidateRequerySuggested();
+        }
+        finally { synchronizingScope = false; }
     }
     public Task RefreshAsync()
     {
@@ -234,10 +304,10 @@ public sealed class DuplicatesViewModel : Bindable, ISnapshotSection
     public Task FindDuplicatesAsync() => FindDuplicatesAsync(Algorithm);
     public async Task FindDuplicatesAsync(string method)
     {
-        if (session.Busy || !session.HasSnapshot) return;
+        if (!CanAnalyze()) return;
         var id = session.Active;
         var snapshots = new[] { id };
-        var roots = session.CurrentRoot == null ? session.SnapshotRoots.ToArray() : new[] { session.CurrentRoot };
+        var roots = SelectedScope is { } scope ? new[] { scope.Root } : [];
         if (CrossDrive)
         {
             var selected = DuplicateRoots.Where(x => x.Selected).ToArray();

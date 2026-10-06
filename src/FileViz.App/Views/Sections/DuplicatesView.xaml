@@ -4,7 +4,7 @@
   <Style x:Key="StageValue" TargetType="TextBlock" BasedOn="{StaticResource MetricValue}"><Setter Property="FontFamily" Value="{StaticResource DisplayFont}"/><Setter Property="FontSize" Value="22"/></Style>
  </UserControl.Resources>
  <Grid Margin="{StaticResource PagePadding}">
-  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition/></Grid.RowDefinitions>
+  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition/></Grid.RowDefinitions>
 
   <DockPanel Margin="0,0,0,14">
    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" IsEnabled="{Binding Session.CanInteract}">
@@ -27,8 +27,23 @@
    </StackPanel>
   </DockPanel>
 
+  <Border Grid.Row="1" Style="{StaticResource Card}" Padding="20,12" Margin="0,0,0,12">
+   <StackPanel IsEnabled="{Binding Session.CanInteract}">
+    <WrapPanel VerticalAlignment="Center">
+     <TextBlock Text="Drive or folder" Style="{StaticResource FieldLabel}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+     <ComboBox ItemsSource="{Binding AvailableScopes}" SelectedItem="{Binding SelectedScope}" DisplayMemberPath="Label" Width="340" MaxDropDownHeight="320" IsEnabled="{Binding CrossDrive, Converter={StaticResource Negate}}" AutomationProperties.Name="Drive or folder for duplicate analysis" ToolTip="Choose a saved drive or folder scan"/>
+     <CheckBox Content="Compare across selected drives" IsChecked="{Binding CrossDrive}" Margin="20,0,0,0" VerticalAlignment="Center" AutomationProperties.Name="Compare duplicate content across selected drives"/>
+    </WrapPanel>
+    <TextBlock Text="{Binding ScopeDescription}" Style="{StaticResource CaptionText}" Margin="0,6,0,0" TextWrapping="Wrap"/>
+    <ItemsControl ItemsSource="{Binding DuplicateRoots}" Visibility="{Binding CrossDrive, Converter={StaticResource Visible}}" Focusable="False" Margin="0,8,0,0" AutomationProperties.Name="Drives and folders for cross-drive analysis">
+     <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+     <ItemsControl.ItemTemplate><DataTemplate><CheckBox IsChecked="{Binding Selected}" Margin="0,0,20,4"><TextBlock Text="{Binding Label}" Style="{StaticResource MonoText}" ToolTip="{Binding State}"/></CheckBox></DataTemplate></ItemsControl.ItemTemplate>
+    </ItemsControl>
+   </StackPanel>
+  </Border>
+
   <!-- Pipeline -->
-  <StackPanel Grid.Row="1">
+  <StackPanel Grid.Row="2">
    <Border Style="{StaticResource Card}" Padding="20,16" Margin="0,0,0,12" Visibility="{Binding HasActivity, Converter={StaticResource Visible}}" AutomationProperties.Name="Duplicate analysis activity">
     <StackPanel>
      <DockPanel>
@@ -64,7 +79,7 @@
   </Border>
   </StackPanel>
 
-  <Grid Grid.Row="2">
+  <Grid Grid.Row="3">
    <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="16"/><ColumnDefinition Width="320"/></Grid.ColumnDefinitions>
    <DockPanel>
     <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
@@ -73,7 +88,7 @@
       <Button Style="{StaticResource IconButton}" Content="&#xE76B;" Command="{Binding PreviousCommand}" AutomationProperties.Name="Previous groups"/>
       <Button Style="{StaticResource IconButton}" Content="&#xE76C;" Command="{Binding NextCommand}" AutomationProperties.Name="Next groups"/>
      </StackPanel>
-     <TextBlock Text="Choose the copy to keep and the copies to remove." Style="{StaticResource CaptionText}" VerticalAlignment="Center"/>
+     <TextBlock Text="Last completed analysis: choose the copy to keep and the copies to remove." Style="{StaticResource CaptionText}" VerticalAlignment="Center" TextWrapping="Wrap"/>
     </DockPanel>
     <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
      <ItemsControl ItemsSource="{Binding Groups}" Focusable="False" AutomationProperties.Name="Duplicate groups">
@@ -143,10 +158,6 @@
        <TextBlock Text="Preferred keeper folder" Style="{StaticResource FieldLabel}"/>
        <TextBox Text="{Binding PreferredFolder}" FontFamily="{StaticResource MonoFont}" AutomationProperties.Name="Preferred keeper folder"/>
        <TextBlock Text="Guides suggested keepers on the next analysis. Suggestions never select removals." Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,4,0,0"/>
-       <CheckBox Content="Compare across selected roots" IsChecked="{Binding CrossDrive}" Margin="0,16,0,4"/>
-       <ItemsControl ItemsSource="{Binding DuplicateRoots}" IsEnabled="{Binding CrossDrive}" Focusable="False" Margin="24,0,0,0">
-        <ItemsControl.ItemTemplate><DataTemplate><CheckBox IsChecked="{Binding Selected}"><TextBlock Text="{Binding Root}" Style="{StaticResource MonoText}" TextTrimming="CharacterEllipsis"/></CheckBox></DataTemplate></ItemsControl.ItemTemplate>
-       </ItemsControl>
       </StackPanel>
      </ScrollViewer>
     </DockPanel>

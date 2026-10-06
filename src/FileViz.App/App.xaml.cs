@@ -1,4 +1,5 @@
 using System.Windows;
+using FileViz.Core;
 using System.Windows.Controls;
 using System.Windows.Media;
 using FileViz.App.Views;
@@ -110,6 +111,55 @@ public partial class App : Application
                     if (window.Model.Session.Store.GetSummary(saved) != before || window.Model.Session.History.First(x => x.Value.Id == saved).Value.State != "Interrupted")
                         throw new InvalidOperationException("Rebuilding must preserve saved inventory and interrupted coverage without rescanning.");
                 }
+                var duplicateScope = Environment.GetEnvironmentVariable("FILEVIZ_SMOKE_DUPLICATE_SCOPE") == "1";
+                if (duplicateScope)
+                {
+                    var original = window.Model.Session.Active;
+                    var originalRoot = Path.GetFullPath(e.Args[1]);
+                    // Keep fixtures outside the database directory, which scans intentionally exclude.
+                    var otherRoot = Path.Combine(Path.GetDirectoryName(originalRoot)!, "another-drive-fixture");
+                    Directory.CreateDirectory(otherRoot);
+                    File.WriteAllText(Path.Combine(otherRoot, "duplicate-a.bin"), "Other scope: same bytes");
+                    File.WriteAllText(Path.Combine(otherRoot, "duplicate-b.bin"), "Other scope: same bytes");
+                    await window.Model.Home.ScanAsync([otherRoot]);
+                    var other = window.Model.Session.Active;
+                    window.Model.SelectedNav = window.Model.NavItems[2];
+                    var picker = window.Model.Duplicates;
+                    var originalScope = picker.AvailableScopes.First(x => x.Snapshot == original && x.Root == originalRoot);
+                    var otherScope = picker.AvailableScopes.First(x => x.Snapshot == other && x.Root == otherRoot);
+                    picker.SelectedScope = originalScope;
+                    if (window.Model.Session.Active != original || window.Model.Session.CurrentRoot != originalRoot || window.Model.SelectedNav.Content != picker)
+                        throw new InvalidOperationException("Drive selection must change snapshot/root without leaving Duplicates.");
+                    picker.SelectedScope = otherScope;
+                    await picker.FindDuplicatesAsync();
+                    if (picker.Duplicates.Count != 2 || picker.Duplicates.Any(x => !Paths.Within(x.Entry.Path, otherRoot)))
+                        throw new InvalidOperationException("Single-drive duplicate results must come only from the chosen scope.");
+                    var busy = picker.FindDuplicatesAsync();
+                    picker.SelectedScope = originalScope;
+                    if (picker.SelectedScope != otherScope || window.Model.Session.Active != other)
+                        throw new InvalidOperationException("Drive selection must be locked during analysis.");
+                    window.Model.Session.CancelCommand.Execute(null);
+                    await busy;
+                    picker.SelectedScope = originalScope;
+                    picker.CrossDrive = true;
+                    foreach (var scope in picker.DuplicateRoots) scope.Selected = true;
+                    await picker.FindDuplicatesAsync();
+                    if (!picker.Duplicates.Any(x => Paths.Within(x.Entry.Path, originalRoot)) || !picker.Duplicates.Any(x => Paths.Within(x.Entry.Path, otherRoot)))
+                        throw new InvalidOperationException("Cross-drive selection must include both selected inventories.");
+                    await Capture(ThemeMode.Light, "duplicate-drive-selection.png");
+                    await Capture(ThemeMode.Dark, "duplicate-drive-selection-dark.png");
+                    picker.CrossDrive = false;
+                    await picker.FindDuplicatesAsync();
+                    if (picker.Duplicates.Any(x => !Paths.Within(x.Entry.Path, originalRoot)))
+                        throw new InvalidOperationException("Returning to one drive must exclude the other drive.");
+                    // A reloaded historical snapshot remains represented when a newer scan exists.
+                    await window.Model.Home.ScanAsync([otherRoot]);
+                    window.Model.Session.SelectedSnapshot = window.Model.Session.History.First(x => x.Value.Id == other);
+                    if (picker.SelectedScope?.Snapshot != other || picker.SelectedScope.Root != otherRoot)
+                        throw new InvalidOperationException("An explicitly reopened historical scope must remain selectable.");
+                    picker.SelectedScope = picker.AvailableScopes.First(x => x.Snapshot == original && x.Root == originalRoot);
+                    window.Model.SelectedNav = window.Model.NavItems[2];
+                }
                 var duplicateActivity = Environment.GetEnvironmentVariable("FILEVIZ_SMOKE_DUPLICATE_ACTIVITY") == "1";
                 if (duplicateActivity)
                 {
@@ -188,6 +238,7 @@ public partial class App : Application
                     Errors = window.Model.Diagnostics.Errors.Count,
                     RebuiltSavedInventory = rebuilt,
                     DuplicateActivityValidated = duplicateActivity,
+                    DuplicateScopeValidated = duplicateScope,
                     RenderedVisibleWindow = true
                 }));
                 Shutdown(window.Model.Explorer.Files.Count > 0 && window.Model.Diagnostics.Errors.Count == 0 && window.Model.Duplicates.Duplicates.Count >= 2 ? 0 : 1);
