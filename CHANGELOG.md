@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.3 — preview
+
+- Load the selected photo's preview automatically. Debounce rapid navigation, cancel superseded reads, and keep stale results from replacing the current image.
+- Add a tri-state Select all matches checkbox covering all pages of the applied filter. Skip blocked photos, retain the 5,000-match review limit, and preserve explicit review before quarantine.
+- Distinguish unanalysed and partial photo coverage from completed results. Use bounded primary-key reads instead of preparing a new index across historical file entries.
+- Add focused photo-folder reviews with their own local database. Verify automatic previews and cross-page selection in Windows CI using disposable fixtures.
+
 ## 0.3.2 — preview
 
 - Use the FileViz brand mark for the Windows executable, running taskbar icon, and title bar. Include nine transparent icon sizes from 16 to 256 pixels and retain SVG source with a reproducible Windows generator.
