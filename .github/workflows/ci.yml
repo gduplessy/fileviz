@@ -11,3 +11,6 @@ jobs:
       - run: dotnet restore FileViz.slnx --locked-mode
       - run: dotnet build FileViz.slnx -c Release --no-restore
       - run: dotnet test FileViz.slnx -c Release --no-build
+      - name: Validate photo desktop controls
+        shell: pwsh
+        run: ./scripts/validate-photo-ui.ps1
