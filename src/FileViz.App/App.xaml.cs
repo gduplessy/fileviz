@@ -61,6 +61,19 @@ public partial class App : Application
         }
         var databaseArgument = Array.IndexOf(e.Args, "--database");
         var database = databaseArgument >= 0 && databaseArgument + 1 < e.Args.Length ? Path.GetFullPath(e.Args[databaseArgument + 1]) : null;
+        var photoFolderArgument = Array.IndexOf(e.Args, "--photo-folder");
+        string? photoFolder = null;
+        if (photoFolderArgument >= 0)
+        {
+            if (photoFolderArgument + 1 >= e.Args.Length || !Directory.Exists(e.Args[photoFolderArgument + 1]))
+            {
+                MessageBox.Show("Choose an existing photo folder for --photo-folder.", "FileViz"); Shutdown(2); return;
+            }
+            photoFolder = Paths.Normalize(e.Args[photoFolderArgument + 1]);
+            // Folder reviews do not inherit a large or unfinished drive inventory.
+            var key = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(photoFolder.ToUpperInvariant())));
+            database ??= Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FileViz", "photo-scans", key, "index.db");
+        }
         if (database?.StartsWith("\\\\", StringComparison.Ordinal) == true)
         {
             MessageBox.Show("The snapshot database must be stored on a local drive.", "FileViz");
@@ -69,6 +82,17 @@ public partial class App : Application
         }
         var window = new MainWindow(smoke ? Path.Combine(Path.GetFullPath(e.Args[2]), "smoke.db") : database);
         window.Show();
+        if (photoFolder != null)
+            window.ContentRendered += async (_, _) =>
+            {
+                await window.Ready.Task;
+                var previous = window.Model.Session.Active;
+                window.Model.Home.PreferMft = false;
+                await window.Model.Home.ScanAsync([photoFolder]);
+                window.Model.SelectedNav = window.Model.NavItems.First(x => x.Label == "Photos");
+                if (window.Model.Session.Active != previous && window.Model.Session.SelectedSnapshot?.Value.State is "Complete" or "Partial")
+                    await window.Model.Photos.AnalyzeAsync();
+            };
         var rebuildArgument = Array.IndexOf(e.Args, "--rebuild-snapshot");
         if (rebuildArgument >= 0 && rebuildArgument + 1 < e.Args.Length && long.TryParse(e.Args[rebuildArgument + 1], out var rebuild) && rebuild > 0)
             window.ContentRendered += async (_, _) => { await window.Ready.Task; await window.Model.Home.RebuildViewsAsync(rebuild); };

@@ -1,6 +1,6 @@
 # Using FileViz
 
-FileViz has six sections in the left pane (Home, Explorer, Duplicates, Compare, Cleanup, Diagnostics) plus Settings. Sections that need a snapshot are disabled until your first scan.
+FileViz has seven sections in the left pane (Home, Explorer, Duplicates, Compare, Cleanup, Diagnostics, Photos) plus Settings. Sections that need a snapshot are disabled until your first scan.
 
 ## Scan (Home)
 
@@ -38,6 +38,11 @@ While analysis runs, the activity card shows preparation, sampling, full hashing
 ## Photos
 
 Open **Photos** (Ctrl+7), choose a saved **Drive or folder**, and click **Analyze photos**. Image dimensions are read on demand in an isolated worker; ordinary drive scans stay metadata-only. JPEG, PNG, GIF, BMP, and TIFF use Windows imaging codecs; WebP, HEIC/HEIF, AVIF, and other listed formats require a compatible installed codec. Unsupported, corrupt, inaccessible, changing, and timed-out images appear under **Show unreadable / unsupported images** and cannot be selected for removal. Reparse points and cloud placeholders are skipped without requesting hydration.
+
+
+For a focused folder review, launch `FileViz.exe --photo-folder "C:\Photos"`. FileViz scans only that folder with the directory engine, then analyzes its image headers. It uses a dedicated local folder-review database so large or unfinished drive inventories do not delay the review. Existing drive snapshots and cleanup journals remain in their original databases. Cancelled or failed scans do not automatically proceed into analysis.
+
+Coverage is explicit: **Not analyzed yet** means there are no saved image reads; an empty list does not mean the images passed. Partial results show how many saved candidates remain unanalysed. Counts use saved extension totals when available, and preparation uses the existing snapshot/path key rather than building an index across historical entries.
 
 Set **Minimum short edge** (720 pixels by default) and/or **Minimum megapixels**. A photo matches if it falls below either enabled threshold; zero disables a threshold. Short-edge filtering treats portrait and landscape equally. **Apply filters** updates the cached results; name/path filtering narrows them further. GIF/multipage dimensions use the maximum width and height across frames, conservatively avoiding thumbnail-sized first pages. These thresholds measure resolution, not blur, compression artifacts, or whether an image is valuable.
 
