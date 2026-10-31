@@ -109,7 +109,7 @@ public class PhotoTests
     }
 
     // Valid PNG fixtures without image-library or package dependencies.
-    private static void WritePng(string path, int width, int height)
+    internal static void WritePng(string path, int width, int height)
     {
         using var file = File.Create(path);
         file.Write([137, 80, 78, 71, 13, 10, 26, 10]);

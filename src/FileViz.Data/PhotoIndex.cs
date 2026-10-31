@@ -14,23 +14,36 @@ public sealed partial class IndexStore
     public void PreparePhotos(long snapshot, CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();
-        using var cancellation = token.Register(() => SQLitePCL.raw.sqlite3_interrupt(connection.Handle!));
-        try
-        {
-            Execute($"CREATE INDEX IF NOT EXISTS entry_{snapshot}_photos ON entries(root,path) WHERE snapshot={snapshot} AND isdir=0 AND extension IN ({ImageExtensions});");
-        }
-        catch (SqliteException e) when (e.SqliteErrorCode == 9 && token.IsCancellationRequested) { throw new OperationCanceledException("Image query preparation cancelled.", e, token); }
+        if (snapshot <= 0) throw new ArgumentOutOfRangeException(nameof(snapshot));
+        // The existing (snapshot,path) primary key supports bounded root-range
+        // reads. A new partial index would scan every historical entry first.
     }
-    public long PhotoCandidateCount(long snapshot, string root) => Convert.ToInt64(Scalar($"SELECT COUNT(*) FROM entries WHERE snapshot=$s AND root=$r AND isdir=0 AND extension IN ({ImageExtensions});", ("$s", snapshot), ("$r", root)));
+    private static (string Start, string End) PhotoRange(string root)
+    {
+        var start = root.TrimEnd('\\') + "\\";
+        return (start, start[..^1] + "]"); // '\\' < every child suffix < ']' under BINARY ordering.
+    }
+    public long? SavedPhotoCandidateCount(long snapshot, string root)
+    {
+        if (Scalar("SELECT 1 FROM root_totals WHERE snapshot=$s AND root=$r;", ("$s", snapshot), ("$r", root)) == null) return null;
+        return Convert.ToInt64(Scalar($"SELECT COALESCE(SUM(files),0) FROM extension_totals WHERE snapshot=$s AND root=$r AND extension IN ({ImageExtensions});", ("$s", snapshot), ("$r", root)));
+    }
+    public long PhotoCandidateCount(long snapshot, string root)
+    {
+        if (SavedPhotoCandidateCount(snapshot, root) is long count) return count;
+        var range = PhotoRange(root);
+        return Convert.ToInt64(Scalar($"SELECT COUNT(*) FROM entries WHERE snapshot=$s AND root=$r AND path>=$start AND path<$end AND isdir=0 AND extension IN ({ImageExtensions});", ("$s", snapshot), ("$r", root), ("$start", range.Start), ("$end", range.End)));
+    }
     /// <summary>Keyset pagination keeps inventory memory bounded and avoids repeated OFFSET scans.</summary>
     public List<PhotoRequest> PhotoCandidates(long snapshot, string root, string after = "", int limit = 64)
     {
+        var range = PhotoRange(root);
         using var command = Command($"""
             SELECT {EntryColumns},p.identity,p.length,p.modified,p.changed,p.width,p.height,p.frames,p.error
             FROM entries e LEFT JOIN photos p ON p.snapshot=e.snapshot AND p.path=e.path
-            WHERE e.snapshot=$s AND e.root=$r AND e.isdir=0 AND e.extension IN ({ImageExtensions}) AND e.path>$after
+            WHERE e.snapshot=$s AND e.root=$r AND e.path>=$start AND e.path<$end AND e.isdir=0 AND e.extension IN ({ImageExtensions}) AND e.path>$after
             ORDER BY e.path LIMIT $limit;
-            """, ("$s", snapshot), ("$r", root), ("$after", after), ("$limit", Math.Clamp(limit, 1, 128)));
+            """, ("$s", snapshot), ("$r", root), ("$start", range.Start), ("$end", range.End), ("$after", after), ("$limit", Math.Clamp(limit, 1, 128)));
         using var reader = command.ExecuteReader();
         var result = new List<PhotoRequest>();
         while (reader.Read())
