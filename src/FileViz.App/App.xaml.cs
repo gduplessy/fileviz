@@ -308,8 +308,15 @@ public partial class App : Application
                     if (model.Photos.Count != 1) throw new InvalidOperationException("Photo name/path filtering must narrow resolution matches.");
                     model.Search = ""; model.ApplyFilter(); await model.RefreshAsync();
                     model.Selected = model.Photos.First(x => x.Name == "portrait-small.jpg");
-                    await model.LoadPreviewAsync();
-                    PhotoStage("Preview loaded");
+                    if (!model.Previewing) throw new InvalidOperationException("Selecting a photo must start its preview automatically.");
+                    var supersededPreview = model.PreviewCompletion;
+                    model.Selected = model.Photos.First(x => x.Name == "landscape-small.png");
+                    await Task.WhenAll(supersededPreview, model.PreviewCompletion);
+                    if (model.Preview == null || model.Preview.PixelWidth <= model.Preview.PixelHeight || model.Previewing)
+                        throw new InvalidOperationException("Rapid row selection must show only the latest preview and release the loading state.");
+                    model.Selected = model.Photos.First(x => x.Name == "portrait-small.jpg");
+                    await model.PreviewCompletion;
+                    PhotoStage("Automatic preview and superseded read validated");
                     if (model.Preview == null || Math.Max(model.Preview.PixelWidth, model.Preview.PixelHeight) > 512)
                         throw new InvalidOperationException("Photo preview must be bounded and rendered.");
                     model.Selected.Remove = true;
@@ -338,6 +345,40 @@ public partial class App : Application
                     var moved = window.Model.Cleanup.CleanupHistory.First(x => x.Original == selected[0].Target.Path && x.State == "Quarantined");
                     window.Model.Cleanup.Restore(moved);
                     if (!File.ReadAllBytes(selected[0].Target.Path).SequenceEqual(previousBytes)) throw new InvalidOperationException("Disposable photo restore must retain all original bytes.");
+                    // Cross-page selection uses only disposable files; protected
+                    // paths remain unselected even when every match is requested.
+                    for (var i = 0; i < 130; i++) File.Copy(Path.Combine(photoRoot, "landscape-small.png"), Path.Combine(photoRoot, $"bulk-{i:D3}.png"));
+                    Directory.CreateDirectory(Path.Combine(photoRoot, "Windows"));
+                    WriteImage(Path.Combine("Windows", "blocked.png"), 200, 200);
+                    await window.Model.Home.ScanAsync([photoRoot]);
+                    window.Model.SelectedNav = window.Model.NavItems.First(x => x.Label == "Photos");
+                    await model.AnalyzeAsync();
+                    if (model.Photos.Count != 100 || model.BuildSelections().Length != 0 || model.AllMatchesSelected != false)
+                        throw new InvalidOperationException("Paged photo results must start without removal selections.");
+                    model.SelectPageCommand.Execute(null);
+                    if (model.BuildSelections().Length != model.Photos.Count(x => x.CanRemove) || model.AllMatchesSelected != null)
+                        throw new InvalidOperationException("Page selection must be partial when more matching photos exist.");
+                    await model.ToggleAllMatchesAsync();
+                    if (model.BuildSelections().Length != 132 || model.AllMatchesSelected != true || model.Photos.Any(x => x.Remove != x.CanRemove))
+                        throw new InvalidOperationException("Select all must cross pages and skip protected photos.");
+                    await Capture(ThemeMode.Light, "photos-select-all.png");
+                    await Capture(ThemeMode.Dark, "photos-select-all-dark.png");
+                    model.NextCommand.Execute(null); await model.RefreshAsync();
+                    if (model.Photos.Count != 33 || model.Photos.Any(x => x.CanRemove && !x.Remove))
+                        throw new InvalidOperationException("Bulk photo selections must survive paging.");
+                    model.Photos.First(x => x.CanRemove).Remove = false;
+                    if (model.BuildSelections().Length != 131 || model.AllMatchesSelected != null)
+                        throw new InvalidOperationException("Individual changes must make the select-all checkbox indeterminate.");
+                    await model.ToggleAllMatchesAsync(); await model.ToggleAllMatchesAsync();
+                    if (model.BuildSelections().Length != 0 || model.AllMatchesSelected != false)
+                        throw new InvalidOperationException("Unchecking select all must clear every page.");
+                    model.Search = "bulk-00"; model.ApplyFilter(); await model.RefreshAsync();
+                    await model.SelectAllMatchesAsync();
+                    if (model.BuildSelections().Length != 10 || model.BuildSelections().Any(x => !x.Target.Name.StartsWith("bulk-00", StringComparison.Ordinal)))
+                        throw new InvalidOperationException("Select all must respect the applied photo filter.");
+                    model.Search = ""; model.ApplyFilter(); await model.RefreshAsync();
+                    if (model.BuildSelections().Length != 0) throw new InvalidOperationException("Changing photo filters must clear prior removal selections.");
+                    PhotoStage("Cross-page checkbox, partial state, protected paths, filters and clear validated");
                     model.SelectedScope = model.AvailableScopes.First(x => x.Snapshot == original);
                     await window.Model.Session.RefreshAsync();
                     if (model.Photos.Count != 0 || window.Model.SelectedNav.Label != "Photos") throw new InvalidOperationException("Photo scope selection must isolate cached matches without leaving Photos.");
@@ -356,6 +397,8 @@ public partial class App : Application
                     DuplicateActivityValidated = duplicateActivity,
                     DuplicateScopeValidated = duplicateScope,
                     PhotosValidated = photos,
+                    PhotosAutoPreviewValidated = photos,
+                    PhotosBulkSelectionValidated = photos,
                     RenderedVisibleWindow = true
                 }));
                 Shutdown(window.Model.Explorer.Files.Count > 0 && window.Model.Diagnostics.Errors.Count == 0 && window.Model.Duplicates.Duplicates.Count >= 2 ? 0 : 1);

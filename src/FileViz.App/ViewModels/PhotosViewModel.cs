@@ -17,7 +17,8 @@ public sealed class PhotoRow(PhotosViewModel owner, PhotoInfo photo) : Bindable
     public string Resolution => Photo.Resolution;
     public string Size => Photo.Entry.SizeText;
     public string Note => Photo.Error ?? (Photo.Frames > 1 ? $"{Photo.Frames} frames · largest dimensions" : "");
-    public bool CanRemove => Photo.Error == null && Photo.Entry.Identity != null && !Photo.Entry.IsPlaceholder && !Photo.Entry.IsReparse && !CleanupService.Protected(Path);
+    public bool CanRemove => CanRemovePhoto(Photo);
+    internal static bool CanRemovePhoto(PhotoInfo photo) => photo.Error == null && photo.Entry.Identity != null && !photo.Entry.IsPlaceholder && !photo.Entry.IsReparse && !CleanupService.Protected(photo.Entry.Path);
     private bool remove;
     public bool Remove
     {
@@ -44,6 +45,9 @@ public sealed class PhotosViewModel : Bindable, ISnapshotSection, IDisposable
     private readonly Stopwatch elapsed = new();
     private readonly Stopwatch heartbeat = new();
     private CancellationTokenSource? previewCancellation;
+    private PhotoRow? previewRow;
+    private Task previewTask = Task.CompletedTask;
+    private int? eligibleMatches;
     private long revision;
     private int page;
     private bool syncing;
@@ -86,6 +90,7 @@ public sealed class PhotosViewModel : Bindable, ISnapshotSection, IDisposable
     private long matches;
     public string PageLabel => $"Page {page + 1} · {matches:N0} matches · up to 100 rows";
     public bool HasSelection => removals.Count > 0 && !Session.Busy;
+    public bool? AllMatchesSelected => removals.Count == 0 ? false : removals.Count == (eligibleMatches ?? matches) ? true : null;
     public string SelectionText => $"{Format.Count(removals.Count, "photo")} selected · {Format.Bytes(removals.Values.Sum(x => x.Entry.Length))}";
     public string SelectionNote => removals.Values.Where(x => x.Entry.Identity != null).GroupBy(x => x.Entry.Identity).Any(x => x.Skip(1).Any())
         ? "Selection includes hard-link aliases; removing an alias may release no allocation."
@@ -102,6 +107,7 @@ public sealed class PhotosViewModel : Bindable, ISnapshotSection, IDisposable
                 Changed(nameof(SelectedPath));
                 Changed(nameof(SelectedDetails));
                 CommandManager.InvalidateRequerySuggested();
+                if (value != null && !Session.Busy) _ = LoadPreviewAsync();
             }
         }
     }
@@ -109,17 +115,18 @@ public sealed class PhotosViewModel : Bindable, ISnapshotSection, IDisposable
     public string SelectedDetails => Selected == null ? "" : $"{Selected.Resolution} · {Selected.Size}\n{Selected.Note}";
     private BitmapSource? preview;
     public BitmapSource? Preview { get => preview; private set => Set(ref preview, value); }
-    private string previewNote = "Load a preview for the selected photo.";
+    private string previewNote = "Select a photo to preview it automatically.";
     public string PreviewNote { get => previewNote; private set => Set(ref previewNote, value); }
     private bool previewing;
     public bool Previewing { get => previewing; private set { Set(ref previewing, value); CommandManager.InvalidateRequerySuggested(); } }
+    internal Task PreviewCompletion => previewTask;
     public ICommand AnalyzeCommand { get; }
     public ICommand FilterCommand { get; }
     public ICommand PreviousCommand { get; }
     public ICommand NextCommand { get; }
     public ICommand SelectPageCommand { get; }
     public ICommand ClearCommand { get; }
-    public ICommand PreviewCommand { get; }
+    public ICommand SelectAllCommand { get; }
     public PhotosViewModel(SessionViewModel session, CleanupViewModel cleanup)
     {
         Session = session; Cleanup = cleanup;
@@ -129,12 +136,17 @@ public sealed class PhotosViewModel : Bindable, ISnapshotSection, IDisposable
         NextCommand = new ActionCommand(() => { page++; session.Run(RefreshAsync); }, () => (long)(page + 1) * 100 < matches && !session.Busy);
         SelectPageCommand = new ActionCommand(() => { foreach (var row in Photos.Where(x => x.CanRemove)) row.Remove = true; }, () => !session.Busy && !ErrorsOnly && Photos.Count > 0);
         ClearCommand = new ActionCommand(ClearSelection, () => removals.Count > 0 && !session.Busy);
-        PreviewCommand = new ActionCommand(() => session.Run(LoadPreviewAsync), () => Selected?.Photo.Error == null && Selected != null && !Previewing && !session.Busy);
+        SelectAllCommand = new ActionCommand(() => session.Run(ToggleAllMatchesAsync), () => session.HasSnapshot && !session.Busy && !ErrorsOnly && matches > 0);
         clock.Tick += (_, _) => { Changed(nameof(ActivityText)); Changed(nameof(ActivityHeartbeat)); };
         session.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName is nameof(SessionViewModel.SelectedSnapshot) or nameof(SessionViewModel.CurrentRoot)) SynchronizeScope();
-            if (e.PropertyName == nameof(SessionViewModel.Busy)) { Changed(nameof(HasSelection)); if (session.Busy) ClearPreview(); }
+            if (e.PropertyName == nameof(SessionViewModel.Busy))
+            {
+                Changed(nameof(HasSelection));
+                if (session.Busy) ClearPreview();
+                else if (Selected != null) _ = LoadPreviewAsync();
+            }
         };
     }
     public void ApplyFilter()
@@ -187,12 +199,13 @@ public sealed class PhotosViewModel : Bindable, ISnapshotSection, IDisposable
     {
         var id = Session.Active; var root = Session.CurrentRoot; if (id == 0 || root == null) return;
         var current = Interlocked.Increment(ref revision); var query = filter; var selectedPage = page; var database = Session.DatabasePath;
-        var result = await Task.Run(() => { using var store = new IndexStore(database); return (store.QueryPhotos(id, root, query, selectedPage), store.PhotoSummary(id, root, query)); });
+        var result = await Task.Run(() => { using var store = new IndexStore(database); return (store.QueryPhotos(id, root, query, selectedPage), store.PhotoSummary(id, root, query), store.SavedPhotoCandidateCount(id, root)); });
         if (current != revision || Session.Active != id || Session.CurrentRoot != root) return;
         Selected = null;
         SessionViewModel.Replace(Photos, result.Item1.Select(info => { var row = new PhotoRow(this, info); row.RestoreSelection(removals.ContainsKey(row.Path)); return row; }));
         matches = result.Item2.Matches;
-        Summary = $"{result.Item2.Inspected:N0} images inspected · {result.Item2.Errors:N0} unreadable · {matches:N0} matches. Cached results may be stale; cleanup rechecks file identity and timestamps.";
+        Summary = new PhotoCoverage(result.Item3, result.Item2.Inspected, result.Item2.Errors, matches).Description + " Cached results may be stale; cleanup rechecks file identity and timestamps.";
+        Changed(nameof(AllMatchesSelected));
         Changed(nameof(PageLabel)); CommandManager.InvalidateRequerySuggested();
     }
     public async Task AnalyzeAsync()
@@ -223,25 +236,71 @@ public sealed class PhotosViewModel : Bindable, ISnapshotSection, IDisposable
     }
     private void ClearPreview()
     {
-        previewCancellation?.Cancel(); Preview = null; PreviewNote = "Load a preview for the selected photo.";
+        previewCancellation?.Cancel(); previewCancellation = null; previewRow = null;
+        Preview = null; Previewing = false; PreviewNote = "Select a photo to preview it automatically.";
     }
-    public async Task LoadPreviewAsync()
+    public Task LoadPreviewAsync()
     {
-        if (Selected is not { } row || Previewing || Session.Busy) return;
-        using var cancellation = new CancellationTokenSource(); previewCancellation = cancellation;
+        if (Selected is not { } row || Session.Busy) return Task.CompletedTask;
+        if (row.Photo.Error != null) { PreviewNote = row.Photo.Error; return Task.CompletedTask; }
+        if (previewRow == row && previewCancellation is { IsCancellationRequested: false }) return previewTask;
+        ClearPreview();
+        var cancellation = new CancellationTokenSource(); previewCancellation = cancellation; previewRow = row;
         Previewing = true; PreviewNote = "Loading preview…";
+        // Cancel superseded reads and serialize workers. Fast keyboard navigation
+        // should start only the latest preview, not a process for every row.
+        previewTask = LoadSelectedPreviewAsync(previewTask, row, cancellation, Session.Administrator);
+        return previewTask;
+    }
+    private async Task LoadSelectedPreviewAsync(Task previous, PhotoRow row, CancellationTokenSource cancellation, bool elevate)
+    {
+        var token = cancellation.Token;
+        bool Current() => previewCancellation == cancellation && Selected == row && !token.IsCancellationRequested;
         try
         {
-            var elevate = Session.Administrator;
-            var result = await Task.Run(async () => { await using var coordinator = new PhotoCoordinator(elevate); return await coordinator.ReadAsync(new(row.Photo.Entry), true, cancellation.Token); });
-            if (Selected != row || cancellation.IsCancellationRequested) return;
+            await previous;
+            await Task.Delay(120, token);
+            var result = await Task.Run(async () => { await using var coordinator = new PhotoCoordinator(elevate); return await coordinator.ReadAsync(new(row.Photo.Entry), true, token); });
+            if (!Current()) return;
             if (result.Preview == null) { PreviewNote = result.Error ?? "Preview unavailable."; return; }
             using var stream = new MemoryStream(result.Preview);
             var bitmap = new BitmapImage(); bitmap.BeginInit(); bitmap.StreamSource = stream; bitmap.CacheOption = BitmapCacheOption.OnLoad; bitmap.EndInit(); bitmap.Freeze();
             Preview = bitmap; PreviewNote = "Preview of the first frame. Dimensions use the largest frame. Open the original for a full review.";
         }
         catch (OperationCanceledException) { }
-        finally { previewCancellation = null; Previewing = false; }
+        catch (Exception e) when (e is not OutOfMemoryException) { if (Current()) PreviewNote = "Preview unavailable: " + e.Message; }
+        finally
+        {
+            if (previewCancellation == cancellation) { previewCancellation = null; previewRow = null; Previewing = false; }
+            cancellation.Dispose();
+        }
+    }
+    public async Task ToggleAllMatchesAsync()
+    {
+        if (Session.Busy || ErrorsOnly) return;
+        if (AllMatchesSelected == true) { ClearSelection(); return; }
+        await SelectAllMatchesAsync();
+    }
+    public async Task SelectAllMatchesAsync()
+    {
+        if (Session.Busy || ErrorsOnly || matches == 0 || Session.CurrentRoot == null) return;
+        if (matches > 5000) { Session.Status = "More than 5,000 matching photos. Narrow the filters before selecting all; your current selection is unchanged."; Changed(nameof(AllMatchesSelected)); return; }
+        var snapshot = Session.Active; var root = Session.CurrentRoot; var query = filter; var version = revision; var database = Session.DatabasePath;
+        var token = Session.BeginWork();
+        Session.Status = "Selecting matching photos across all pages…";
+        try
+        {
+            var candidates = await Task.Run(() => { using var store = new IndexStore(database); return store.PhotoSelectionCandidates(snapshot, root, query, token); });
+            token.ThrowIfCancellationRequested();
+            if (snapshot != Session.Active || root != Session.CurrentRoot || version != revision || query != filter) return;
+            if (candidates.Count > 5000) throw new InvalidOperationException("More than 5,000 matching photos. Narrow the filters; your current selection is unchanged.");
+            var selectable = candidates.Where(PhotoRow.CanRemovePhoto).ToArray();
+            removals.Clear(); foreach (var photo in selectable) removals[photo.Entry.Path] = photo;
+            eligibleMatches = selectable.Length;
+            foreach (var row in Photos) row.RestoreSelection(removals.ContainsKey(row.Path));
+            Session.Status = $"{removals.Count:N0} matching photos selected across all pages. Review removals before quarantine.";
+        }
+        finally { Session.EndWork(); ChangedSelection(); }
     }
     internal bool CanSelect(string path)
     {
@@ -253,11 +312,11 @@ public sealed class PhotosViewModel : Bindable, ISnapshotSection, IDisposable
         if (row.Remove) removals[row.Path] = row.Photo; else removals.Remove(row.Path);
         ChangedSelection();
     }
-    private void ChangedSelection() { Changed(nameof(HasSelection)); Changed(nameof(SelectionText)); Changed(nameof(SelectionNote)); }
+    private void ChangedSelection() { Changed(nameof(HasSelection)); Changed(nameof(SelectionText)); Changed(nameof(SelectionNote)); Changed(nameof(AllMatchesSelected)); }
     public void ClearSelection()
     {
-        removals.Clear(); foreach (var row in Photos) row.RestoreSelection(false); ChangedSelection();
+        removals.Clear(); eligibleMatches = null; foreach (var row in Photos) row.RestoreSelection(false); ChangedSelection();
     }
     public CleanupSelection[] BuildSelections() => Session.Busy ? [] : removals.Values.Select(x => new CleanupSelection(x.Entry)).ToArray();
-    public void Dispose() { clock.Stop(); previewCancellation?.Cancel(); }
+    public void Dispose() { clock.Stop(); ClearPreview(); }
 }

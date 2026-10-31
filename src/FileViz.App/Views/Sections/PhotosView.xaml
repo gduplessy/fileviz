@@ -35,7 +35,11 @@
      <Border DockPanel.Dock="Top" Style="{StaticResource CardHeader}" Padding="12,8">
       <DockPanel>
        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal"><Button Content="Previous" Command="{Binding PreviousCommand}" Style="{StaticResource SubtleButton}"/><Button Content="Next" Command="{Binding NextCommand}" Style="{StaticResource SubtleButton}"/></StackPanel>
-       <StackPanel><TextBlock Text="{Binding PageLabel}" Style="{StaticResource CaptionText}"/><CheckBox Content="Show unreadable / unsupported images" IsChecked="{Binding ErrorsOnly}" IsEnabled="{Binding Session.CanInteract}" Margin="0,4,0,0" AutomationProperties.Name="Show photo analysis errors"/></StackPanel>
+       <StackPanel>
+        <TextBlock Text="{Binding PageLabel}" Style="{StaticResource CaptionText}"/>
+        <CheckBox Content="Select all matches (all pages)" IsThreeState="True" IsChecked="{Binding AllMatchesSelected, Mode=OneWay}" Command="{Binding SelectAllCommand}" Margin="0,4,0,0" AutomationProperties.Name="Select all matching photos" ToolTip="Select eligible matches across all pages, up to 5,000. Review is required before any files move. Uncheck to clear the selection."/>
+        <CheckBox Content="Show unreadable / unsupported images" IsChecked="{Binding ErrorsOnly}" IsEnabled="{Binding Session.CanInteract}" Margin="0,4,0,0" AutomationProperties.Name="Show photo analysis errors"/>
+       </StackPanel>
       </DockPanel>
      </Border>
      <DataGrid ItemsSource="{Binding Photos}" SelectedItem="{Binding Selected}" Style="{StaticResource ListGrid}" SelectionMode="Single" IsEnabled="{Binding Session.CanInteract}" AutomationProperties.Name="Low resolution photo results">
@@ -58,9 +62,9 @@
       <StackPanel>
        <TextBlock Text="{Binding Selected.Name}" Style="{StaticResource BodyStrongText}" TextTrimming="CharacterEllipsis" ToolTip="{Binding SelectedPath}"/>
        <TextBlock Text="{Binding SelectedDetails}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,4,0,8"/>
-       <UniformGrid Columns="2" Margin="0,0,0,8"><Button Content="Load preview" Command="{Binding PreviewCommand}" Margin="0,0,4,0"/><Button Content="Explorer" Click="Show_Click" Margin="4,0,0,0" ToolTip="{Binding SelectedPath}"/></UniformGrid>
+       <Button Content="Explorer" Click="Show_Click" Margin="0,0,0,8" ToolTip="{Binding SelectedPath}"/>
        <Border Background="{DynamicResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4" Height="140"><Image Source="{Binding Preview}" Stretch="Uniform" AutomationProperties.Name="Selected photo preview"/></Border>
-       <TextBlock Text="{Binding PreviewNote}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,8,0,8"/>
+       <TextBlock Text="{Binding PreviewNote}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,8,0,8" AutomationProperties.LiveSetting="Polite"/>
        <Rectangle Height="1" Fill="{DynamicResource DividerStrokeColorDefaultBrush}" Margin="0,4,0,12"/>
        <TextBlock Text="{Binding SelectionText}" Style="{StaticResource BodyStrongText}" TextWrapping="Wrap"/>
        <TextBlock Text="{Binding SelectionNote}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,4,0,8"/>

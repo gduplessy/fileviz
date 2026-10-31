@@ -75,15 +75,25 @@ public sealed partial class IndexStore
     }
     private static string PhotoWhere(PhotoFilter filter) => filter.ErrorsOnly ? "p.error IS NOT NULL" : "p.error IS NULL AND (($edge>0 AND MIN(p.width,p.height)<$edge) OR ($pixels>0 AND CAST(p.width AS INTEGER)*p.height<$pixels))";
     public List<PhotoInfo> QueryPhotos(long snapshot, string root, PhotoFilter filter, int page = 0)
+        => ReadPhotos(snapshot, root, filter, 100, (long)Math.Max(0, page) * 100);
+    /// <summary>One extra row detects an oversized selection before any choices are changed.</summary>
+    public List<PhotoInfo> PhotoSelectionCandidates(long snapshot, string root, PhotoFilter filter, CancellationToken token = default)
+    {
+        token.ThrowIfCancellationRequested();
+        using var cancellation = token.Register(() => SQLitePCL.raw.sqlite3_interrupt(connection.Handle!));
+        try { return ReadPhotos(snapshot, root, filter, 5001, 0); }
+        catch (SqliteException e) when (e.SqliteErrorCode == 9 && token.IsCancellationRequested) { throw new OperationCanceledException("Photo selection cancelled.", e, token); }
+    }
+    private List<PhotoInfo> ReadPhotos(long snapshot, string root, PhotoFilter filter, int limit, long offset)
     {
         filter.Validate();
         using var command = Command($"""
             SELECT {EntryColumns},p.identity,p.length,p.modified,p.changed,p.width,p.height,p.frames,p.error
             FROM photos p JOIN entries e ON e.snapshot=p.snapshot AND e.path=p.path
             WHERE p.snapshot=$s AND e.root=$r AND {PhotoWhere(filter)} AND e.path LIKE $search ESCAPE '!'
-            ORDER BY CAST(p.width AS INTEGER)*p.height,p.path LIMIT 100 OFFSET $offset;
+            ORDER BY CAST(p.width AS INTEGER)*p.height,p.path LIMIT $limit OFFSET $offset;
             """, ("$s", snapshot), ("$r", root), ("$edge", filter.MinimumShortEdge), ("$pixels", filter.MinimumMegapixels * 1_000_000),
-            ("$search", "%" + EscapeLike(filter.Search) + "%"), ("$offset", (long)Math.Max(0, page) * 100));
+            ("$search", "%" + EscapeLike(filter.Search) + "%"), ("$limit", limit), ("$offset", offset));
         using var reader = command.ExecuteReader();
         var result = new List<PhotoInfo>();
         while (reader.Read()) result.Add(Photo(reader, Entry(reader)));

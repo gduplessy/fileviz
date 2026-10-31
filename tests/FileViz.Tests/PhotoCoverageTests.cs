@@ -9,6 +9,32 @@ namespace FileViz.Tests;
 public class PhotoCoverageTests
 {
     [Fact]
+    public void BulkSelectionReadsAcrossPagesButStaysBoundedAndScoped()
+    {
+        using var fixture = new Fixture();
+        using var store = new IndexStore(Path.Combine(fixture.Root, "selection.db"));
+        var root = Path.Combine(fixture.Root, "photos");
+        var other = Path.Combine(fixture.Root, "other");
+        var snapshot = store.CreateSnapshot([root, other]);
+        FileEntry Entry(string folder, string name) => new(Path.Combine(folder, name), folder, name, name, false, 14, 14, 1, 2, 0);
+        var entries = Enumerable.Range(0, 5002).Select(i => Entry(root, $"match-{i:D5}.png")).ToArray();
+        var neighbor = Entry(other, "match-other.png");
+        var unreadable = Entry(root, "unreadable.png");
+        store.AddBatch(snapshot, new(root, "Fixture", [.. entries, unreadable], []));
+        store.AddBatch(snapshot, new(other, "Fixture", [neighbor], []));
+        store.SavePhotos(snapshot, entries.Select(e => new PhotoInfo(e, 200, 200)).Concat([new(neighbor, 200, 200), new(unreadable, 0, 0, Error: "Bad header")]));
+        Assert.Equal(100, store.QueryPhotos(snapshot, root, new()).Count);
+        var candidates = store.PhotoSelectionCandidates(snapshot, root, new());
+        Assert.Equal(5001, candidates.Count);
+        Assert.All(candidates, photo => Assert.Equal(root, photo.Entry.Parent));
+        Assert.All(candidates, photo => Assert.Null(photo.Error));
+        Assert.Single(store.PhotoSelectionCandidates(snapshot, root, new(Search: "match-00000.png")));
+        Assert.Single(store.PhotoSelectionCandidates(snapshot, other, new()));
+        using var cancellation = new CancellationTokenSource(); cancellation.Cancel();
+        Assert.Throws<OperationCanceledException>(() => store.PhotoSelectionCandidates(snapshot, root, new(), cancellation.Token));
+    }
+
+    [Fact]
     public void EmptyAndPartialAnalysisNeverImplyThatUnattemptedImagesPassed()
     {
         Assert.Contains("Not analyzed yet", new PhotoCoverage(12, 0, 0, 0).Description);
